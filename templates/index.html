@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PP Scanner - Pre & Post Market Movers</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-card: rgba(18, 26, 42, 0.75);
+            --bg-card-hover: rgba(28, 40, 65, 0.85);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --border-active: rgba(0, 230, 153, 0.4);
+            
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            
+            --accent-green: #10b981;
+            --accent-green-bg: rgba(16, 185, 129, 0.12);
+            --accent-red: #ef4444;
+            --accent-red-bg: rgba(239, 68, 68, 0.12);
+            --accent-yellow: #f59e0b;
+            --accent-yellow-bg: rgba(245, 158, 11, 0.15);
+            --accent-blue: #3b82f6;
+            --accent-blue-bg: rgba(59, 130, 246, 0.15);
+            --accent-purple: #8b5cf6;
+            
+            --font-main: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.08) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.08) 0px, transparent 50%);
+            color: var(--text-primary);
+            font-family: var(--font-main);
+            min-height: 100vh;
+            padding: 2rem;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .title-area h1 {
+            font-size: 1.85rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .badge-live {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.65rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-active {
+            background: var(--accent-green-bg);
+            color: var(--accent-green);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .badge-inactive {
+            background: rgba(148, 163, 184, 0.12);
+            color: #94a3b8;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .stat-card-clickable {
+            cursor: pointer;
+        }
+
+        .stat-card:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+        }
+
+        .status-connected {
+            color: var(--accent-green);
+        }
+        .status-disconnected {
+            color: var(--accent-red);
+        }
+        .status-warning {
+            color: var(--accent-yellow);
+        }
+
+        .btn-pause {
+            background: rgba(239, 68, 68, 0.15);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            padding: 0.55rem 1.25rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-pause:hover:not(:disabled) {
+            background: rgba(239, 68, 68, 0.25);
+            border-color: rgba(239, 68, 68, 0.6);
+        }
+
+        .btn-pause.btn-resume {
+            background: rgba(16, 185, 129, 0.15);
+            color: #6ee7b7;
+            border: 1px solid rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-pause.btn-resume:hover:not(:disabled) {
+            background: rgba(16, 185, 129, 0.25);
+            border-color: rgba(16, 185, 129, 0.6);
+        }
+
+        .btn-pause:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            border-color: var(--border-color);
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .table-container {
+            background: var(--bg-card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .movers-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+
+        .movers-table th {
+            background: rgba(15, 23, 42, 0.85);
+            color: var(--text-secondary);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            user-select: none;
+            transition: color 0.2s ease, background 0.2s ease;
+        }
+
+        .movers-table th:hover {
+            color: var(--text-primary);
+            background: rgba(30, 41, 59, 0.9);
+        }
+
+        .movers-table th .sort-icon {
+            display: inline-block;
+            margin-left: 0.4rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .movers-table th.active-sort {
+            color: var(--accent-blue);
+        }
+
+        .movers-table th.active-sort .sort-icon {
+            color: var(--accent-blue);
+        }
+
+        .movers-table td {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            vertical-align: middle;
+        }
+
+        .movers-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .movers-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .symbol-cell {
+            font-weight: 800;
+            font-size: 1.1rem;
+            font-family: var(--font-mono);
+            color: var(--text-primary);
+        }
+
+        .price-cell {
+            font-family: var(--font-mono);
+            font-weight: 600;
+        }
+
+        .pct-cell {
+            font-family: var(--font-mono);
+            font-weight: 700;
+            font-size: 0.95rem;
+            padding: 0.25rem 0.55rem;
+            border-radius: 6px;
+            display: inline-block;
+        }
+
+        .pct-up {
+            color: var(--accent-green);
+            background: var(--accent-green-bg);
+        }
+
+        .pct-down {
+            color: var(--accent-red);
+            background: var(--accent-red-bg);
+        }
+
+        .vol-cell {
+            font-family: var(--font-mono);
+            color: var(--text-secondary);
+        }
+
+        .briefing-cell {
+            max-width: 480px;
+        }
+
+        .briefing-subject {
+            font-weight: 600;
+            color: #93c5fd;
+            font-size: 0.85rem;
+            line-height: 1.35;
+        }
+
+        .briefing-snippet {
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            margin-top: 0.25rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .no-news {
+            color: var(--text-muted);
+            font-style: italic;
+            font-size: 0.8rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-secondary);
+        }
+
+        /* Modal Styles */
+        .modal-backdrop {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(8px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-backdrop.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #0f172a;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            overflow: hidden;
+        }
+
+        .modal-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.95);
+        }
+
+        .modal-header h2 {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-close-modal {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            transition: color 0.2s ease;
+        }
+
+        .btn-close-modal:hover {
+            color: var(--text-primary);
+            background: rgba(255,255,255,0.05);
+        }
+
+        .modal-body {
+            padding: 1.25rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            flex: 1;
+        }
+
+        .modal-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .tab-btn {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.4rem 0.85rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+            background: rgba(255,255,255,0.08);
+        }
+
+        .tab-btn.active {
+            background: var(--accent-blue-bg);
+            color: #93c5fd;
+            border-color: rgba(59, 130, 246, 0.4);
+        }
+
+        .logs-list-container {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: rgba(10, 14, 23, 0.8);
+            font-family: var(--font-mono);
+            font-size: 0.82rem;
+        }
+
+        .log-item {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            display: flex;
+            gap: 0.75rem;
+            align-items: flex-start;
+            line-height: 1.4;
+        }
+
+        .log-item:last-child {
+            border-bottom: none;
+        }
+
+        .log-time {
+            color: var(--text-muted);
+            white-space: nowrap;
+            font-size: 0.75rem;
+        }
+
+        .log-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .badge-warning {
+            background: var(--accent-yellow-bg);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .badge-error {
+            background: var(--accent-red-bg);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .log-message {
+            color: var(--text-primary);
+            word-break: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="title-area">
+                <h1>PP Scanner <span class="badge-live badge-inactive" id="lbl-market-status">Market Closed</span></h1>
+            </div>
+            <button id="btn-toggle-pause" class="btn-pause" onclick="togglePause()" disabled>
+                ⏸ Pause Scans
+            </button>
+        </header>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">IBKR Connection</div>
+                <div class="stat-value" id="stat-ibkr">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Market Status</div>
+                <div class="stat-value" id="stat-market-status">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Last Scan</div>
+                <div class="stat-value" id="stat-last-scan">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Matches</div>
+                <div class="stat-value" id="stat-matches">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Top Gainer</div>
+                <div class="stat-value status-connected" id="stat-top-gainer">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Top Loser</div>
+                <div class="stat-value status-disconnected" id="stat-top-loser">--</div>
+            </div>
+            <div class="stat-card stat-card-clickable" onclick="openLogsModal()">
+                <div class="stat-label">Warnings & Errors 🔍</div>
+                <div class="stat-value" id="stat-logs-count">0</div>
+            </div>
+        </div>
+
+        <!-- Movers Table -->
+        <div class="table-container">
+            <table class="movers-table">
+                <thead>
+                    <tr>
+                        <th id="th-symbol" onclick="sortBy('symbol')">
+                            Ticker <span class="sort-icon" id="icon-symbol">↕</span>
+                        </th>
+                        <th id="th-price" onclick="sortBy('price')">
+                            Price <span class="sort-icon" id="icon-price">↕</span>
+                        </th>
+                        <th id="th-price_change_pct" class="active-sort" onclick="sortBy('price_change_pct')">
+                            % Change <span class="sort-icon" id="icon-price_change_pct">▼</span>
+                        </th>
+                        <th id="th-volume" onclick="sortBy('volume')">
+                            Pre/Post Vol <span class="sort-icon" id="icon-volume">↕</span>
+                        </th>
+                        <th id="th-rel_volume_pct" onclick="sortBy('rel_volume_pct')">
+                            Rel Vol (% ADV) <span class="sort-icon" id="icon-rel_volume_pct">↕</span>
+                        </th>
+                        <style>
+                        </style>
+                        <th style="cursor: default;">
+                            Briefing News
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <tr>
+                        <td colspan="6" class="empty-state">
+                            Scanning market universe for movers...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Log Inspector Modal -->
+    <div class="modal-backdrop" id="modal-logs" onclick="closeLogsModalOnBackdrop(event)">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📋 Scan Warnings & Errors Log</h2>
+                <button class="btn-close-modal" onclick="closeLogsModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-tabs">
+                    <button class="tab-btn active" id="tab-all" onclick="filterModalLogs('ALL')">All Logs (<span id="count-all">0</span>)</button>
+                    <button class="tab-btn" id="tab-warn" onclick="filterModalLogs('WARNING')">Warnings (<span id="count-warn">0</span>)</button>
+                    <button class="tab-btn" id="tab-err" onclick="filterModalLogs('ERROR')">Errors (<span id="count-err">0</span>)</button>
+                </div>
+                <div class="logs-list-container" id="logs-list-body">
+                    <div class="empty-state">No warnings or errors captured during scan.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let sortField = 'abs_change_pct';
+        let sortAsc = false;
+        let rawResults = [];
+        let rawLogs = [];
+        let currentLogFilter = 'ALL';
+
+        async function fetchScanResults() {
+            try {
+                const response = await fetch('/api/scan-results');
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    const statusText = data.market_status || 'Market Closed';
+                    const statusBadge = document.getElementById('lbl-market-status');
+                    statusBadge.innerText = statusText;
+                    
+                    const isGreenSession = (statusText === 'Premarket' || statusText === 'Postmarket');
+                    if (isGreenSession) {
+                        statusBadge.className = 'badge-live badge-active';
+                    } else {
+                        statusBadge.className = 'badge-live badge-inactive';
+                    }
+
+                    document.getElementById('stat-market-status').innerText = statusText;
+                    document.getElementById('stat-matches').innerText = data.total_matches;
+                    
+                    const lastScanEl = document.getElementById('stat-last-scan');
+                    if (data.last_scan_end_time_pt) {
+                        lastScanEl.innerText = `${data.last_scan_end_time_pt} (${data.last_scan_duration_sec}s)`;
+                    } else {
+                        lastScanEl.innerText = '--';
+                    }
+                    
+                    const ibEl = document.getElementById('stat-ibkr');
+                    if (data.ib_connected) {
+                        ibEl.innerText = 'Connected';
+                        ibEl.className = 'stat-value status-connected';
+                    } else {
+                        ibEl.innerText = 'Disconnected';
+                        ibEl.className = 'stat-value status-disconnected';
+                    }
+
+                    const pauseBtn = document.getElementById('btn-toggle-pause');
+                    if (data.is_active_session) {
+                        pauseBtn.disabled = false;
+                        if (data.is_paused) {
+                            pauseBtn.innerText = '▶ Resume Scans';
+                            pauseBtn.className = 'btn-pause btn-resume';
+                        } else {
+                            pauseBtn.innerText = '⏸ Pause Scans';
+                            pauseBtn.className = 'btn-pause';
+                        }
+                    } else {
+                        pauseBtn.disabled = true;
+                        pauseBtn.innerText = '⏸ Pause Scans';
+                        pauseBtn.className = 'btn-pause';
+                    }
+
+                    // Update Logs Stat Card
+                    rawLogs = data.scan_logs || [];
+                    const warnCount = data.warning_count || 0;
+                    const errCount = data.error_count || 0;
+                    const totalLogs = warnCount + errCount;
+                    
+                    const logsCountEl = document.getElementById('stat-logs-count');
+                    if (totalLogs === 0) {
+                        logsCountEl.innerText = '0';
+                        logsCountEl.className = 'stat-value';
+                    } else if (errCount > 0) {
+                        logsCountEl.innerText = `${warnCount}W / ${errCount}E`;
+                        logsCountEl.className = 'stat-value status-disconnected';
+                    } else {
+                        logsCountEl.innerText = `${warnCount} Warnings`;
+                        logsCountEl.className = 'stat-value status-warning';
+                    }
+
+                    document.getElementById('count-all').innerText = totalLogs;
+                    document.getElementById('count-warn').innerText = warnCount;
+                    document.getElementById('count-err').innerText = errCount;
+
+                    renderModalLogs();
+
+                    rawResults = data.results || [];
+                    updateTopMovers();
+                    renderTable();
+                }
+            } catch (err) {
+                console.error("Error fetching scan results:", err);
+            }
+        }
+
+        function openLogsModal() {
+            document.getElementById('modal-logs').classList.add('active');
+        }
+
+        function closeLogsModal() {
+            document.getElementById('modal-logs').classList.remove('active');
+        }
+
+        function closeLogsModalOnBackdrop(event) {
+            if (event.target.id === 'modal-logs') {
+                closeLogsModal();
+            }
+        }
+
+        function filterModalLogs(filter) {
+            currentLogFilter = filter;
+            document.getElementById('tab-all').className = (filter === 'ALL') ? 'tab-btn active' : 'tab-btn';
+            document.getElementById('tab-warn').className = (filter === 'WARNING') ? 'tab-btn active' : 'tab-btn';
+            document.getElementById('tab-err').className = (filter === 'ERROR') ? 'tab-btn active' : 'tab-btn';
+            renderModalLogs();
+        }
+
+        function renderModalLogs() {
+            const container = document.getElementById('logs-list-body');
+            if (!rawLogs || rawLogs.length === 0) {
+                container.innerHTML = `<div class="empty-state">No warnings or errors captured.</div>`;
+                return;
+            }
+
+            let filtered = rawLogs;
+            if (currentLogFilter === 'WARNING') {
+                filtered = rawLogs.filter(l => l.level === 'WARNING');
+            } else if (currentLogFilter === 'ERROR') {
+                filtered = rawLogs.filter(l => l.level === 'ERROR');
+            }
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="empty-state">No ${currentLogFilter.toLowerCase()} entries found.</div>`;
+                return;
+            }
+
+            container.innerHTML = filtered.map(item => {
+                const badgeClass = item.level === 'ERROR' ? 'badge-error' : 'badge-warning';
+                return `
+                    <div class="log-item">
+                        <span class="log-time">${item.timestamp}</span>
+                        <span class="log-badge ${badgeClass}">${item.level}</span>
+                        <span class="log-message">${escapeHtml(item.message)}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateTopMovers() {
+            if (!rawResults || rawResults.length === 0) {
+                document.getElementById('stat-top-gainer').innerText = '--';
+                document.getElementById('stat-top-loser').innerText = '--';
+                return;
+            }
+
+            const gainers = rawResults.filter(r => r.price_change_pct > 0).sort((a, b) => b.price_change_pct - a.price_change_pct);
+            const losers = rawResults.filter(r => r.price_change_pct < 0).sort((a, b) => a.price_change_pct - b.price_change_pct);
+
+            if (gainers.length > 0) {
+                document.getElementById('stat-top-gainer').innerText = `${gainers[0].symbol} +${gainers[0].price_change_pct.toFixed(2)}%`;
+            } else {
+                document.getElementById('stat-top-gainer').innerText = '--';
+            }
+
+            if (losers.length > 0) {
+                document.getElementById('stat-top-loser').innerText = `${losers[0].symbol} ${losers[0].price_change_pct.toFixed(2)}%`;
+            } else {
+                document.getElementById('stat-top-loser').innerText = '--';
+            }
+        }
+
+        function sortBy(field) {
+            if (sortField === field) {
+                sortAsc = !sortAsc;
+            } else {
+                sortField = field;
+                sortAsc = (field === 'symbol'); // default A-Z for symbol, DESC for numbers
+            }
+            updateSortHeaders();
+            renderTable();
+        }
+
+        function updateSortHeaders() {
+            const fields = ['symbol', 'price', 'price_change_pct', 'volume', 'rel_volume_pct'];
+            fields.forEach(f => {
+                const th = document.getElementById(`th-${f}`);
+                const icon = document.getElementById(`icon-${f}`);
+                if (!th || !icon) return;
+
+                if (f === sortField) {
+                    th.className = 'active-sort';
+                    icon.innerText = sortAsc ? '▲' : '▼';
+                } else {
+                    th.className = '';
+                    icon.innerText = '↕';
+                }
+            });
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('table-body');
+            if (!rawResults || rawResults.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No stocks currently matching mover criteria (|%Change| ≥ 2.0% & Rel Vol ≥ 5.0%)</td></tr>`;
+                return;
+            }
+
+            let sorted = [...rawResults];
+            sorted.sort((a, b) => {
+                let valA = a[sortField];
+                let valB = b[sortField];
+
+                if (typeof valA === 'string') {
+                    return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                } else {
+                    return sortAsc ? valA - valB : valB - valA;
+                }
+            });
+
+            tbody.innerHTML = sorted.map(item => {
+                const isUp = item.price_change_pct >= 0;
+                const pctClass = isUp ? 'pct-up' : 'pct-down';
+                const sign = isUp ? '+' : '';
+
+                let newsHtml = `<span class="no-news">No Briefing.com match</span>`;
+                if (item.briefing_news) {
+                    newsHtml = `
+                        <div class="briefing-cell">
+                            <div class="briefing-subject">📧 ${escapeHtml(item.briefing_news.subject)}</div>
+                            <div class="briefing-snippet">${escapeHtml(item.briefing_news.snippet)}</div>
+                        </div>
+                    `;
+                }
+
+                return `
+                    <tr>
+                        <td class="symbol-cell">${item.symbol}</td>
+                        <td class="price-cell">$${item.price.toFixed(2)}</td>
+                        <td><span class="pct-cell ${pctClass}">${sign}${item.price_change_pct.toFixed(2)}%</span></td>
+                        <td class="vol-cell">${item.volume.toLocaleString()}</td>
+                        <td class="vol-cell">${item.rel_volume_pct.toFixed(1)}%</td>
+                        <td>${newsHtml}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        async function togglePause() {
+            try {
+                await fetch('/api/toggle-pause', { method: 'POST' });
+                await fetchScanResults();
+            } catch (err) {
+                console.error("Error toggling pause state:", err);
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeLogsModal();
+        });
+
+        // Poll API every 3 seconds
+        fetchScanResults();
+        setInterval(fetchScanResults, 3000);
+    </script>
+</body>
+</html>
