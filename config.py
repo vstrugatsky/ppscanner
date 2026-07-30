@@ -14,6 +14,7 @@ class IBConfig:
     port: int = 4001
     client_id: int = 1
     market_data_type: int = 1  # 1 = Real-Time Live, 2 = Frozen, 3 = Delayed, 4 = Delayed Frozen
+    req_tickers_timeout_sec: float = 3.0
 
 
 @dataclass

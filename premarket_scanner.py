@@ -202,10 +202,26 @@ class PremarketScanner:
 
             async def fetch_chunk(c_list):
                 try:
-                    return await asyncio.wait_for(ib.reqTickersAsync(*c_list), timeout=3.0)
+                    return await asyncio.wait_for(
+                        ib.reqTickersAsync(*c_list), timeout=self.config.ib.req_tickers_timeout_sec
+                    )
                 except asyncio.TimeoutError:
+                    symbols = [c.symbol for c in c_list]
+                    logger.warning(
+                        "reqTickersAsync timed out after %.1fs for batch of %d symbols: %s. Falling back to local ticker snapshots.",
+                        self.config.ib.req_tickers_timeout_sec,
+                        len(c_list),
+                        symbols,
+                    )
                     return [ib.ticker(c) for c in c_list]
-                except Exception:
+                except Exception as e:
+                    symbols = [c.symbol for c in c_list]
+                    logger.warning(
+                        "reqTickersAsync failed with error for batch of %d symbols (%s): %s",
+                        len(c_list),
+                        symbols,
+                        e,
+                    )
                     return []
 
             chunk_results = await asyncio.gather(*[fetch_chunk(c) for c in chunks])
