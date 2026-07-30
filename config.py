@@ -13,6 +13,7 @@ class IBConfig:
     host: str = "127.0.0.1"
     port: int = 4001
     client_id: int = 1
+    market_data_type: int = 1  # 1 = Real-Time Live, 2 = Frozen, 3 = Delayed, 4 = Delayed Frozen
 
 
 @dataclass
@@ -23,10 +24,16 @@ class GmailConfig:
 
 
 @dataclass
+class BriefingConfig:
+    max_initial_emails: int = 300
+    max_incremental_emails: int = 50
+    max_cache_size: int = 500
+
+
+@dataclass
 class ScanCriteria:
     min_rel_volume_pct: float = 5.0
     min_abs_price_change_pct: float = 2.0
-    max_briefing_emails: int = 300
 
 
 class Config:
@@ -37,6 +44,7 @@ class Config:
 
         self.ib = IBConfig()
         self.gmail = GmailConfig()
+        self.briefing = BriefingConfig()
         self.scan = ScanCriteria()
 
         # Session Windows (Pacific Time)

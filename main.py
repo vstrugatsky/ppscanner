@@ -49,7 +49,7 @@ def main():
 
     ib_manager = IBClientManager(config)
     gmail_manager = GmailClientManager(config.gmail)
-    briefing_client = BriefingNewsClient(gmail_manager)
+    briefing_client = BriefingNewsClient(gmail_manager, config.briefing)
 
     scanner = PremarketScanner(config, ib_manager, briefing_client)
 

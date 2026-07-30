@@ -4,6 +4,8 @@ import asyncio
 from typing import Any, Optional
 from gmail_client import GmailClientManager
 
+from config import BriefingConfig
+
 logger = logging.getLogger(__name__)
 
 
@@ -23,21 +25,19 @@ def count_tickers_in_subject(subject: str) -> int:
     return len(valid_tickers) if valid_tickers else 999
 
 
-import time
-
-
 class BriefingNewsClient:
     """Retrieves Briefing.com emails from Inbox, caches them in memory, and matches tickers."""
 
-    def __init__(self, gmail_manager: GmailClientManager):
+    def __init__(self, gmail_manager: GmailClientManager, config: BriefingConfig | None = None):
         self.gmail_manager = gmail_manager
+        self.config = config or BriefingConfig()
         self.email_cache: list[dict[str, Any]] = []
         self.seen_msg_ids: set[str] = set()
 
-    async def sync_emails(self, max_initial_emails: int = 300) -> int:
+    async def sync_emails(self, max_initial_emails: int | None = None) -> int:
         """Syncs Briefing.com emails into memory cache.
-        If cache is empty, loads up to max_initial_emails.
-        If cache exists, fetches only new/unseen messages (up to 50).
+        If cache is empty, loads up to max_initial_emails (default from config).
+        If cache exists, fetches only new/unseen messages (up to max_incremental_emails from config).
         Returns the number of new emails added.
         """
         service = self.gmail_manager.service
@@ -49,13 +49,22 @@ class BriefingNewsClient:
             return 0
 
         try:
-            fetch_limit = max_initial_emails if not self.email_cache else 50
+            is_incremental = bool(self.email_cache)
+            initial_limit = max_initial_emails if max_initial_emails is not None else self.config.max_initial_emails
+            fetch_limit = self.config.max_incremental_emails if is_incremental else initial_limit
+
             res = await self.gmail_manager.list_messages_async(max_results=fetch_limit, query="from:briefing.com")
             messages = res.get("messages", [])
 
             new_msgs = [m for m in messages if m.get("id") and m["id"] not in self.seen_msg_ids]
             if not new_msgs:
                 return 0
+
+            if is_incremental and len(new_msgs) >= self.config.max_incremental_emails:
+                logger.warning(
+                    "All %d incremental Briefing.com emails were new. Some emails may have been missed between sync cycles.",
+                    self.config.max_incremental_emails,
+                )
 
             logger.info("Syncing %d new Briefing.com emails into memory cache...", len(new_msgs))
 
@@ -102,8 +111,13 @@ class BriefingNewsClient:
 
             # Prepend new emails so most recent are first
             self.email_cache = new_parsed + self.email_cache
-            if len(self.email_cache) > 500:
-                self.email_cache = self.email_cache[:500]
+            if len(self.email_cache) > self.config.max_cache_size:
+                logger.warning(
+                    "Briefing email cache size (%d) exceeded maximum limit of %d. Truncating oldest emails.",
+                    len(self.email_cache),
+                    self.config.max_cache_size,
+                )
+                self.email_cache = self.email_cache[: self.config.max_cache_size]
 
             return len(new_parsed)
 
@@ -143,7 +157,7 @@ class BriefingNewsClient:
         return results
 
     async def get_news_for_symbols_batch(
-        self, symbols: list[str], max_emails: int = 300
+        self, symbols: list[str], max_emails: int | None = None
     ) -> dict[str, Optional[dict[str, Any]]]:
         """Backward-compatible wrapper: syncs emails and returns instant matches from cache."""
         await self.sync_emails(max_initial_emails=max_emails)

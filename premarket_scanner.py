@@ -5,7 +5,7 @@ from datetime import datetime, time
 from typing import Any, Optional
 import zoneinfo
 
-from ib_async import IB, Contract
+from ib_async import IB, Contract, util
 from config import Config, ET_TZ, PT_TZ
 from ib_client import IBClientManager
 from briefing_news import BriefingNewsClient
@@ -60,11 +60,7 @@ class PremarketScanner:
 
         # Cached state across session runs
         self.adv20_cache: dict[str, float] = {}          # symbol -> 20-day ADV
-        self.rth_close_cache: dict[str, float] = {}     # symbol -> today RTH 4pm close
-        self.rth_volume_cache: dict[str, float] = {}    # symbol -> today RTH market close volume
-
         self.last_adv20_session_key: Optional[str] = None
-        self.last_rth_session_key: Optional[str] = None
 
         # Scan metadata
         self.is_scanning: bool = False
@@ -107,8 +103,20 @@ class PremarketScanner:
         else:
             return "Market Closed", False, False
 
+    def _is_postmarket_bar(self, bar_date: Any) -> bool:
+        """Helper to determine if a bar's timestamp is at or after 16:00 ET (4:00 PM Eastern Time)."""
+        if isinstance(bar_date, str):
+            bar_date = util.parseIBDatetime(bar_date)
+        if isinstance(bar_date, datetime):
+            if bar_date.tzinfo is not None:
+                dt_et = bar_date.astimezone(ET_TZ)
+            else:
+                dt_et = bar_date.replace(tzinfo=ET_TZ)
+            return dt_et.time() >= time(16, 0)
+        return False
+
     async def _fetch_adv20_batch(self, contracts: list[Contract]):
-        """Fetches 20-day daily bars in parallel to calculate ADV20 for all contracts."""
+        """Fetches 20 daily RTH bars in parallel to calculate ADV20 over the last 20 market days for all contracts."""
         logger.info("Initializing ADV20 calculation for %d contracts...", len(contracts))
         ib = self.ib_manager.ib
         semaphore = asyncio.Semaphore(40)
@@ -127,8 +135,15 @@ class PremarketScanner:
                     )
                     if bars and len(bars) > 0:
                         vols = [b.volume for b in bars if b.volume is not None and b.volume >= 0]
-                        if vols:
-                            adv = sum(vols) / float(len(vols))
+                        if len(vols) < 20:
+                            logger.warning(
+                                "ADV20 notice for %s: Received only %d market bars (fewer than 20 market days required).",
+                                c.symbol,
+                                len(vols),
+                            )
+                        recent_20_vols = vols[-20:]
+                        if recent_20_vols:
+                            adv = sum(recent_20_vols) / float(len(recent_20_vols))
                             if adv > 0:
                                 self.adv20_cache[c.symbol] = adv
                                 return
@@ -138,36 +153,6 @@ class PremarketScanner:
 
         await asyncio.gather(*[_fetch_one(c) for c in contracts])
         logger.info("ADV20 calculation complete. Successfully cached ADV20 for %d tickers.", len(self.adv20_cache))
-
-    async def _fetch_rth_close_and_volume_batch(self, contracts: list[Contract]):
-        """Fetches current day 1-day RTH bar at 13:02 PT to cache RTH close price and volume for post-market."""
-        logger.info("Caching today's RTH closing price and volume for %d contracts...", len(contracts))
-        ib = self.ib_manager.ib
-        semaphore = asyncio.Semaphore(40)
-
-        async def _fetch_one(c: Contract):
-            async with semaphore:
-                try:
-                    bars = await ib.reqHistoricalDataAsync(
-                        c,
-                        endDateTime="",
-                        durationStr="1 D",
-                        barSizeSetting="1 day",
-                        whatToShow="TRADES",
-                        useRTH=True,
-                        formatDate=1,
-                    )
-                    if bars and len(bars) > 0:
-                        last_bar = bars[-1]
-                        if last_bar.close and last_bar.close > 0:
-                            self.rth_close_cache[c.symbol] = float(last_bar.close)
-                        if last_bar.volume is not None and last_bar.volume >= 0:
-                            self.rth_volume_cache[c.symbol] = float(last_bar.volume)
-                except Exception as e:
-                    logger.warning("Failed to fetch RTH close/volume for %s: %s", c.symbol, e)
-
-        await asyncio.gather(*[_fetch_one(c) for c in contracts])
-        logger.info("RTH close/volume caching complete (%d closes, %d volumes cached).", len(self.rth_close_cache), len(self.rth_volume_cache))
 
     async def scan(self, force: bool = False) -> list[dict[str, Any]]:
         """Executes a complete scan over all universe contracts following spec rules."""
@@ -206,14 +191,9 @@ class PremarketScanner:
                 await self._fetch_adv20_batch(contracts)
                 self.last_adv20_session_key = adv_session_key
 
-            # 2. Initialize RTH close (yesterday's 4pm close) and volume cache on the first run of the session
-            is_postmarket = (session_name == "Postmarket") or (force and now_pt.hour >= 13)
-            rth_session_key = f"{today_date_str}_{session_name}"
-            if self.last_rth_session_key != rth_session_key or not self.rth_close_cache:
-                await self._fetch_rth_close_and_volume_batch(contracts)
-                self.last_rth_session_key = rth_session_key
+            is_postmarket = (session_name == "Postmarket") or (session_name != "Premarket" and now_pt.hour >= 13)
 
-            # 3. Snapshot market data for all universe tickers in bulk using IBKR reqTickers
+            # 2. Snapshot market data for all universe tickers in bulk using IBKR reqTickers
             logger.info("Fetching live market data snapshots for %d contracts...", len(contracts))
             ib = self.ib_manager.ib
 
@@ -253,12 +233,15 @@ class PremarketScanner:
                 elif t.close and not math.isnan(t.close) and t.close > 0:
                     price = t.close
 
-                if price <= 0:
-                    continue
+                base_close = t.close if (t.close and not math.isnan(t.close) and t.close > 0) else None
 
-                base_close = self.rth_close_cache.get(symbol) or (t.close if t.close and not math.isnan(t.close) and t.close > 0 else None)
-
-                if not base_close or base_close <= 0:
+                if price <= 0 or not base_close or base_close <= 0:
+                    logger.warning(
+                        "Price or close is 0 or not found for ticker %s (t.last=%s, t.close=%s) - skipping.",
+                        symbol,
+                        t.last,
+                        t.close,
+                    )
                     continue
 
                 price_change = price - base_close
@@ -278,37 +261,41 @@ class PremarketScanner:
                         "snap_volume": t.volume if (t.volume and not math.isnan(t.volume) and t.volume >= 0) else 0.0,
                     })
 
-            # Pass 2: Query consolidated 1-day bar (useRTH=False) ONLY for candidate movers
+            # Pass 2: Volume calculation
+            # In premarket: use t.volume directly (snap_volume) - no historical API call needed.
+            # In postmarket: query 1-hour bars (1 D) with useRTH=False for candidate movers and aggregate bars >= 16:00 ET.
             if candidates:
-                logger.info("Fetching consolidated session volume for %d candidate movers...", len(candidates))
+                if is_postmarket:
+                    logger.info("Fetching 1-hour postmarket volume bars for %d candidate movers...", len(candidates))
 
-                async def fetch_candidate_full_volume(c: dict[str, Any]) -> float:
-                    try:
-                        bars = await ib.reqHistoricalDataAsync(
-                            c["contract"],
-                            endDateTime="",
-                            durationStr="1 D",
-                            barSizeSetting="1 day",
-                            whatToShow="TRADES",
-                            useRTH=False,
-                            formatDate=1,
-                        )
-                        if bars:
-                            return float(bars[0].volume)
-                    except Exception as e:
-                        logger.warning("Failed to fetch full volume for %s: %s", c["symbol"], e)
-                    return c["snap_volume"]
+                    async def fetch_candidate_postmarket_volume(c: dict[str, Any]) -> float:
+                        try:
+                            bars = await ib.reqHistoricalDataAsync(
+                                c["contract"],
+                                endDateTime="",
+                                durationStr="1 D",
+                                barSizeSetting="1 hour",
+                                whatToShow="TRADES",
+                                useRTH=False,
+                                formatDate=1,
+                            )
+                            if bars:
+                                pm_vol = sum(
+                                    b.volume
+                                    for b in bars
+                                    if b.volume is not None and b.volume >= 0 and self._is_postmarket_bar(b.date)
+                                )
+                                return float(pm_vol)
+                        except Exception as e:
+                            logger.warning("Failed to fetch postmarket 1-hour bars for %s: %s", c["symbol"], e)
+                        return c["snap_volume"]
 
-                full_volumes = await asyncio.gather(*[fetch_candidate_full_volume(c) for c in candidates])
-                for c, full_vol in zip(candidates, full_volumes):
-                    if is_postmarket:
-                        rth_vol = self.rth_volume_cache.get(c["symbol"], 0.0)
-                        c["session_volume"] = max(0.0, full_vol - rth_vol)
-                    else:
-                        c["session_volume"] = max(c["snap_volume"], full_vol)
-            else:
-                for c in candidates:
-                    c["session_volume"] = c["snap_volume"]
+                    pm_volumes = await asyncio.gather(*[fetch_candidate_postmarket_volume(c) for c in candidates])
+                    for c, pm_vol in zip(candidates, pm_volumes):
+                        c["session_volume"] = pm_vol
+                else:
+                    for c in candidates:
+                        c["session_volume"] = c["snap_volume"]
 
             # Filter candidates by Rel Vol % >= min_rel_volume_pct
             matches: list[dict[str, Any]] = []
@@ -336,7 +323,7 @@ class PremarketScanner:
             # Enrich matching tickers with Briefing.com emails from Gmail Inbox
             if matches:
                 mover_symbols = [m["symbol"] for m in matches]
-                news_map = await self.briefing_client.get_news_for_symbols_batch(mover_symbols, max_emails=self.config.scan.max_briefing_emails)
+                news_map = await self.briefing_client.get_news_for_symbols_batch(mover_symbols)
                 for m in matches:
                     m["briefing_news"] = news_map.get(m["symbol"])
 

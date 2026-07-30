@@ -30,7 +30,7 @@ class IBClientManager:
                     clientId=self.config.ib.client_id,
                     timeout=10,
                 )
-                self.ib.reqMarketDataType(1)  # Request IBKR Real-Time Live Market Data
+                self.ib.reqMarketDataType(self.config.ib.market_data_type)  # Request IBKR Market Data Type from config
                 logger.info("Connected to IBKR successfully.")
                 return True
             except Exception as e:
