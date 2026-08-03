@@ -8,23 +8,23 @@
     <style>
         :root {
             --bg-primary: #0a0e17;
-            --bg-card: rgba(18, 26, 42, 0.75);
-            --bg-card-hover: rgba(28, 40, 65, 0.85);
-            --border-color: rgba(255, 255, 255, 0.08);
-            --border-active: rgba(0, 230, 153, 0.4);
+            --bg-card: rgba(18, 26, 42, 0.85);
+            --bg-card-hover: rgba(28, 40, 65, 0.95);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --border-active: rgba(16, 185, 129, 0.4);
             
-            --text-primary: #f1f5f9;
+            --text-primary: #f8fafc;
             --text-secondary: #94a3b8;
             --text-muted: #64748b;
             
             --accent-green: #10b981;
-            --accent-green-bg: rgba(16, 185, 129, 0.12);
+            --accent-green-bg: rgba(16, 185, 129, 0.15);
             --accent-red: #ef4444;
-            --accent-red-bg: rgba(239, 68, 68, 0.12);
+            --accent-red-bg: rgba(239, 68, 68, 0.15);
             --accent-yellow: #f59e0b;
-            --accent-yellow-bg: rgba(245, 158, 11, 0.15);
+            --accent-yellow-bg: rgba(245, 158, 11, 0.18);
             --accent-blue: #3b82f6;
-            --accent-blue-bg: rgba(59, 130, 246, 0.15);
+            --accent-blue-bg: rgba(59, 130, 246, 0.18);
             --accent-purple: #8b5cf6;
             
             --font-main: 'Inter', system-ui, -apple-system, sans-serif;
@@ -40,117 +40,103 @@
         body {
             background-color: var(--bg-primary);
             background-image: 
-                radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.08) 0px, transparent 50%),
-                radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.08) 0px, transparent 50%);
+                radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.1) 0px, transparent 50%);
             color: var(--text-primary);
             font-family: var(--font-main);
             min-height: 100vh;
-            padding: 2rem;
+            padding: 1.75rem;
             line-height: 1.5;
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 1480px;
             margin: 0 auto;
         }
 
-        header {
+        /* Situational Awareness Header Card */
+        .awareness-header {
+            background: var(--bg-card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .header-top {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 2rem;
-            padding-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+            padding-bottom: 1.25rem;
             border-bottom: 1px solid var(--border-color);
         }
 
-        .title-area h1 {
-            font-size: 1.85rem;
+        .title-group {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .title-group h1 {
+            font-size: 1.75rem;
             font-weight: 800;
             background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+        }
+
+        .status-badge {
+            font-size: 0.78rem;
+            padding: 0.3rem 0.75rem;
+            border-radius: 9999px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 0.4rem;
         }
 
         .badge-live {
-            font-size: 0.75rem;
-            padding: 0.25rem 0.65rem;
-            border-radius: 9999px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .badge-active {
             background: var(--accent-green-bg);
             color: var(--accent-green);
-            border: 1px solid rgba(16, 185, 129, 0.3);
+            border: 1px solid rgba(16, 185, 129, 0.4);
         }
 
-        .badge-inactive {
+        .badge-gray {
             background: rgba(148, 163, 184, 0.12);
             color: #94a3b8;
             border: 1px solid rgba(148, 163, 184, 0.3);
         }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-
-        .stat-card {
-            background: var(--bg-card);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 1.25rem;
-            transition: transform 0.2s ease, border-color 0.2s ease;
-        }
-
-        .stat-card-clickable {
-            cursor: pointer;
-        }
-
-        .stat-card:hover {
-            border-color: rgba(255, 255, 255, 0.15);
-            transform: translateY(-2px);
-        }
-
-        .stat-label {
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 0.5rem;
-        }
-
-        .stat-value {
-            font-size: 1.35rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            font-family: var(--font-mono);
-        }
-
-        .status-connected {
+        .badge-ibkr-connected {
+            background: var(--accent-green-bg);
             color: var(--accent-green);
-        }
-        .status-disconnected {
-            color: var(--accent-red);
-        }
-        .status-warning {
-            color: var(--accent-yellow);
+            border: 1px solid rgba(16, 185, 129, 0.4);
         }
 
-        .btn-pause {
-            background: rgba(239, 68, 68, 0.15);
-            color: #fca5a5;
+        .badge-ibkr-disconnected {
+            background: var(--accent-red-bg);
+            color: var(--accent-red);
             border: 1px solid rgba(239, 68, 68, 0.4);
-            padding: 0.55rem 1.25rem;
+        }
+
+        .controls-group {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .btn-action {
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 0.55rem 1.1rem;
             border-radius: 8px;
             font-weight: 600;
             font-size: 0.85rem;
@@ -161,37 +147,138 @@
             transition: all 0.2s ease;
         }
 
-        .btn-pause:hover:not(:disabled) {
-            background: rgba(239, 68, 68, 0.25);
-            border-color: rgba(239, 68, 68, 0.6);
+        .btn-action:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.25);
         }
 
-        .btn-pause.btn-resume {
-            background: rgba(16, 185, 129, 0.15);
-            color: #6ee7b7;
-            border: 1px solid rgba(16, 185, 129, 0.4);
-        }
-
-        .btn-pause.btn-resume:hover:not(:disabled) {
-            background: rgba(16, 185, 129, 0.25);
-            border-color: rgba(16, 185, 129, 0.6);
-        }
-
-        .btn-pause:disabled {
+        .btn-action:disabled {
             opacity: 0.4;
             cursor: not-allowed;
-            border-color: var(--border-color);
+            background: rgba(255, 255, 255, 0.02);
+            border-color: rgba(255, 255, 255, 0.05);
             color: var(--text-muted);
-            background: rgba(255, 255, 255, 0.03);
         }
 
+        .btn-primary {
+            background: var(--accent-blue-bg);
+            color: #93c5fd;
+            border-color: rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: rgba(59, 130, 246, 0.3);
+            border-color: rgba(59, 130, 246, 0.6);
+        }
+
+        .btn-toggle-auto {
+            background: rgba(245, 158, 11, 0.12);
+            color: #fcd34d;
+            border-color: rgba(245, 158, 11, 0.35);
+        }
+
+        .btn-toggle-auto.active {
+            background: var(--accent-green-bg);
+            color: #6ee7b7;
+            border-color: rgba(16, 185, 129, 0.5);
+        }
+
+        .session-selector {
+            display: flex;
+            background: rgba(10, 14, 23, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.2rem;
+        }
+
+        .session-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 0.4rem 0.85rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .session-btn.active {
+            background: var(--accent-blue);
+            color: #ffffff;
+        }
+
+        .session-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Metrics Bar */
+        .metrics-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1.25rem;
+        }
+
+        .metric-item {
+            background: rgba(10, 14, 23, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 0.85rem 1.1rem;
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.25rem;
+        }
+
+        .metric-value {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+        }
+
+        /* Card Section Header */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .section-header h2 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Table Card */
         .table-container {
             background: var(--bg-card);
             backdrop-filter: blur(12px);
             border: 1px solid var(--border-color);
-            border-radius: 14px;
+            border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            margin-bottom: 2rem;
+        }
+
+        .table-toolbar {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.6);
         }
 
         .movers-table {
@@ -208,7 +295,7 @@
             text-transform: uppercase;
             font-size: 0.75rem;
             letter-spacing: 0.05em;
-            padding: 1rem 1.25rem;
+            padding: 0.9rem 1.1rem;
             border-bottom: 1px solid var(--border-color);
             cursor: pointer;
             user-select: none;
@@ -222,7 +309,7 @@
 
         .movers-table th .sort-icon {
             display: inline-block;
-            margin-left: 0.4rem;
+            margin-left: 0.35rem;
             font-size: 0.75rem;
             color: var(--text-muted);
         }
@@ -236,7 +323,7 @@
         }
 
         .movers-table td {
-            padding: 1rem 1.25rem;
+            padding: 0.9rem 1.1rem;
             border-bottom: 1px solid rgba(255, 255, 255, 0.04);
             vertical-align: middle;
         }
@@ -246,7 +333,7 @@
         }
 
         .movers-table tr:hover td {
-            background: rgba(255, 255, 255, 0.02);
+            background: rgba(255, 255, 255, 0.025);
         }
 
         .symbol-cell {
@@ -264,7 +351,7 @@
         .pct-cell {
             font-family: var(--font-mono);
             font-weight: 700;
-            font-size: 0.95rem;
+            font-size: 0.92rem;
             padding: 0.25rem 0.55rem;
             border-radius: 6px;
             display: inline-block;
@@ -314,11 +401,110 @@
 
         .empty-state {
             text-align: center;
-            padding: 4rem 2rem;
+            padding: 3.5rem 2rem;
             color: var(--text-secondary);
         }
 
-        /* Modal Styles */
+        /* Troubleshooting Diagnostics Section */
+        .trouble-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .trouble-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .trouble-card h3 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .summary-group {
+            margin-bottom: 0.9rem;
+        }
+
+        .summary-group-title {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.35rem;
+        }
+
+        .summary-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            max-height: 90px;
+            overflow-y: auto;
+            padding: 0.35rem;
+            background: rgba(10, 14, 23, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+        }
+
+        .summary-tag {
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-muted);
+            padding: 0.15rem 0.45rem;
+            border-radius: 4px;
+        }
+
+        .logs-table-container {
+            max-height: 280px;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            background: rgba(10, 14, 23, 0.6);
+        }
+
+        .log-row {
+            padding: 0.6rem 0.85rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            display: flex;
+            gap: 0.6rem;
+            align-items: flex-start;
+        }
+
+        .log-row:last-child {
+            border-bottom: none;
+        }
+
+        .log-time {
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .log-level-warn {
+            color: #fbbf24;
+            font-weight: 700;
+        }
+
+        .log-level-err {
+            color: #fca5a5;
+            font-weight: 700;
+        }
+
+        /* Test Scan Modal */
         .modal-backdrop {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -334,332 +520,563 @@
             display: flex;
         }
 
-        .modal-content {
+        .modal-card {
             background: #0f172a;
             border: 1px solid var(--border-color);
             border-radius: 16px;
             width: 90%;
-            max-width: 900px;
-            max-height: 80vh;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
-            overflow: hidden;
+            max-width: 550px;
+            padding: 1.5rem;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
         }
 
-        .modal-header {
-            padding: 1.25rem 1.5rem;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: rgba(15, 23, 42, 0.95);
-        }
-
-        .modal-header h2 {
-            font-size: 1.15rem;
+        .modal-card h3 {
+            font-size: 1.2rem;
             font-weight: 700;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .btn-close-modal {
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            font-size: 1.25rem;
-            cursor: pointer;
-            padding: 0.25rem 0.5rem;
-            border-radius: 6px;
-            transition: color 0.2s ease;
-        }
-
-        .btn-close-modal:hover {
-            color: var(--text-primary);
-            background: rgba(255,255,255,0.05);
-        }
-
-        .modal-body {
-            padding: 1.25rem 1.5rem;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            flex: 1;
-        }
-
-        .modal-tabs {
-            display: flex;
-            gap: 0.5rem;
             margin-bottom: 1rem;
         }
 
-        .tab-btn {
-            background: rgba(255,255,255,0.04);
-            border: 1px solid var(--border-color);
-            color: var(--text-secondary);
-            padding: 0.4rem 0.85rem;
-            border-radius: 6px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .tab-btn:hover {
-            color: var(--text-primary);
-            background: rgba(255,255,255,0.08);
-        }
-
-        .tab-btn.active {
-            background: var(--accent-blue-bg);
-            color: #93c5fd;
-            border-color: rgba(59, 130, 246, 0.4);
-        }
-
-        .logs-list-container {
-            flex: 1;
-            overflow-y: auto;
+        .modal-card textarea {
+            width: 100%;
+            height: 110px;
+            background: rgba(10, 14, 23, 0.8);
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            background: rgba(10, 14, 23, 0.8);
-            font-family: var(--font-mono);
-            font-size: 0.82rem;
-        }
-
-        .log-item {
-            padding: 0.75rem 1rem;
-            border-bottom: 1px solid rgba(255,255,255,0.03);
-            display: flex;
-            gap: 0.75rem;
-            align-items: flex-start;
-            line-height: 1.4;
-        }
-
-        .log-item:last-child {
-            border-bottom: none;
-        }
-
-        .log-time {
-            color: var(--text-muted);
-            white-space: nowrap;
-            font-size: 0.75rem;
-        }
-
-        .log-badge {
-            font-size: 0.7rem;
-            font-weight: 700;
-            padding: 0.15rem 0.4rem;
-            border-radius: 4px;
-            text-transform: uppercase;
-            white-space: nowrap;
-        }
-
-        .badge-warning {
-            background: var(--accent-yellow-bg);
-            color: #fbbf24;
-            border: 1px solid rgba(245, 158, 11, 0.3);
-        }
-
-        .badge-error {
-            background: var(--accent-red-bg);
-            color: #fca5a5;
-            border: 1px solid rgba(239, 68, 68, 0.3);
-        }
-
-        .log-message {
             color: var(--text-primary);
-            word-break: break-word;
+            font-family: var(--font-mono);
+            padding: 0.75rem;
+            font-size: 0.88rem;
+            resize: none;
+            margin-bottom: 1rem;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+        }
+
+        /* Full data toggle column classes */
+        .col-full {
+            display: none;
+        }
+        .full-data-active .col-full {
+            display: table-cell;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <header>
-            <div class="title-area">
-                <h1>PP Scanner <span class="badge-live badge-inactive" id="lbl-market-status">Market Closed</span></h1>
-            </div>
-            <button id="btn-toggle-pause" class="btn-pause" onclick="togglePause()" disabled>
-                ⏸ Pause Scans
-            </button>
-        </header>
 
-        <!-- Stats Grid -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-label">IBKR Connection</div>
-                <div class="stat-value" id="stat-ibkr">--</div>
+        <!-- Situational Awareness Header Card -->
+        <div class="awareness-header">
+            <div class="header-top">
+                <div class="title-group">
+                    <h1>PP Scanner</h1>
+                    <span id="lbl-market-status" class="status-badge badge-gray">Market Closed</span>
+                    <span id="lbl-ibkr-status" class="status-badge badge-ibkr-disconnected">IBKR Disconnected</span>
+                </div>
+
+                <div class="controls-group">
+                    <!-- Session Selector (Premarket & Postmarket) -->
+                    <div class="session-selector">
+                        <button id="btn-sess-pm" class="session-btn" onclick="selectSession('premarket')">Premarket</button>
+                        <button id="btn-sess-post" class="session-btn" onclick="selectSession('postmarket')">Postmarket</button>
+                    </div>
+
+                    <!-- 1. Manual Run Scan -->
+                    <button id="btn-run-scan" class="btn-action btn-primary" onclick="runManualScan()">
+                        ▶ Run Scan Now
+                    </button>
+
+                    <!-- 2. Auto-scan toggle (15s interval) -->
+                    <button id="btn-toggle-auto" class="btn-action btn-toggle-auto" onclick="toggleAutoScan()">
+                        ⚡ Auto-Scan 15s: OFF
+                    </button>
+
+                    <!-- 3. Test Scan Modal Trigger -->
+                    <button id="btn-test-scan" class="btn-action" onclick="openTestModal()">
+                        🧪 Test Scan
+                    </button>
+
+                    <!-- 4. Restore Full Results Button (Shown when viewing Test Scan results) -->
+                    <button id="btn-restore-full" class="btn-action" onclick="restoreFullResults()" style="display: none; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: #60a5fa;" title="Exit Test View and restore cached full scan results">
+                        📋 Restore Full Scan
+                    </button>
+                </div>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">Market Status</div>
-                <div class="stat-value" id="stat-market-status">--</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Last Scan</div>
-                <div class="stat-value" id="stat-last-scan">--</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Total Matches</div>
-                <div class="stat-value" id="stat-matches">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Top Gainer</div>
-                <div class="stat-value status-connected" id="stat-top-gainer">--</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Top Loser</div>
-                <div class="stat-value status-disconnected" id="stat-top-loser">--</div>
-            </div>
-            <div class="stat-card stat-card-clickable" onclick="openLogsModal()">
-                <div class="stat-label">Warnings & Errors 🔍</div>
-                <div class="stat-value" id="stat-logs-count">0</div>
+
+            <!-- Metrics Bar -->
+            <div class="metrics-bar">
+                <div class="metric-item">
+                    <div class="metric-label">⚡ Baseline</div>
+                    <div class="metric-value" id="val-baseline-end" style="font-size: 1.0rem; margin-top: 2px;">--</div>
+                    <div class="metric-subtext" id="val-baseline-counts" style="font-size: 0.72rem; color: #a7f3d0; margin-top: 2px;">PC: -- | ADV: --</div>
+                </div>
+                <div class="metric-item" style="position: relative;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <div class="metric-label">📊 Last Scan</div>
+                        <button id="btn-reload-cache" onclick="reloadCache()" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; cursor: pointer; transition: all 0.2s;" title="Invalidate current session cache and force fresh scan">
+                            🗑️ Reload
+                        </button>
+                    </div>
+                    <div class="metric-value" id="val-last-scan" style="font-size: 1.0rem; margin-top: 2px;">--</div>
+                    <div class="metric-subtext" id="val-last-counts" style="font-size: 0.72rem; color: #a7f3d0; margin-top: 2px;">PC: -- | ADV: -- | C: -- | V: --</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">🎯 Total Matches</div>
+                    <div class="metric-value" id="val-total-matches" style="font-size: 1.2rem;">0</div>
+                </div>
             </div>
         </div>
 
-        <!-- Movers Table -->
-        <div class="table-container">
+        <!-- Movers Display Table Card -->
+        <div class="table-container" id="movers-container">
+            <div class="table-toolbar">
+                <h2 style="font-size: 1.1rem; font-weight: 700;">📈 Market Movers</h2>
+                <button id="btn-toggle-full" class="btn-action" onclick="toggleFullData()">
+                    📊 Full Data: OFF
+                </button>
+            </div>
+
             <table class="movers-table">
                 <thead>
                     <tr>
-                        <th id="th-symbol" onclick="sortBy('symbol')">
-                            Ticker <span class="sort-icon" id="icon-symbol">↕</span>
-                        </th>
-                        <th id="th-price" onclick="sortBy('price')">
-                            Price <span class="sort-icon" id="icon-price">↕</span>
-                        </th>
-                        <th id="th-price_change_pct" class="active-sort" onclick="sortBy('price_change_pct')">
-                            % Change <span class="sort-icon" id="icon-price_change_pct">▼</span>
-                        </th>
-                        <th id="th-volume" onclick="sortBy('volume')">
-                            Pre/Post Vol <span class="sort-icon" id="icon-volume">↕</span>
-                        </th>
-                        <th id="th-rel_volume_pct" onclick="sortBy('rel_volume_pct')">
-                            Rel Vol (% ADV) <span class="sort-icon" id="icon-rel_volume_pct">↕</span>
-                        </th>
-                        <style>
-                        </style>
-                        <th style="cursor: default;">
-                            Briefing News
-                        </th>
+                        <th id="th-symbol" onclick="sortBy('symbol')">Ticker <span class="sort-icon" id="icon-symbol">↕</span></th>
+                        <th id="th-price_change_pct" class="active-sort" onclick="sortBy('price_change_pct')">% Change <span class="sort-icon" id="icon-price_change_pct">▼</span></th>
+                        <th id="th-rel_volume_pct" onclick="sortBy('rel_volume_pct')">Rel Vol (% ADV) <span class="sort-icon" id="icon-rel_volume_pct">↕</span></th>
+                        
+                        <!-- Full Data Optional Columns -->
+                        <th class="col-full" id="th-price" onclick="sortBy('price')">Current Price <span class="sort-icon" id="icon-price">↕</span></th>
+                        <th class="col-full" id="th-prev_close" onclick="sortBy('prev_close')">Prev Close <span class="sort-icon" id="icon-prev_close">↕</span></th>
+                        <th class="col-full" id="th-volume" onclick="sortBy('volume')">Session Vol <span class="sort-icon" id="icon-volume">↕</span></th>
+                        <th class="col-full" id="th-adv" onclick="sortBy('adv')">ADV20 <span class="sort-icon" id="icon-adv">↕</span></th>
+                        
+                        <th style="cursor: default;">Briefing News</th>
                     </tr>
                 </thead>
                 <tbody id="table-body">
                     <tr>
-                        <td colspan="6" class="empty-state">
-                            Scanning market universe for movers...
-                        </td>
+                        <td colspan="8" class="empty-state">Loading scan results...</td>
                     </tr>
                 </tbody>
             </table>
         </div>
+
+        <!-- Troubleshooting Diagnostics Section -->
+        <div class="trouble-grid">
+            <!-- Last Scan Summary Card -->
+            <div class="trouble-card">
+                <h3>🔍 Last Scan Summary</h3>
+                <div class="summary-group">
+                    <div class="summary-group-title">
+                        <span>Tickers without Current Price</span>
+                        <span id="sum-missing-price-cnt" style="font-weight: 700; color: #fca5a5;">0</span>
+                    </div>
+                    <div class="summary-tags" id="sum-missing-price-list">--</div>
+                </div>
+
+                <div class="summary-group">
+                    <div class="summary-group-title">
+                        <span>Tickers without Previous Close</span>
+                        <span id="sum-missing-close-cnt" style="font-weight: 700; color: #fca5a5;">0</span>
+                    </div>
+                    <div class="summary-tags" id="sum-missing-close-list">--</div>
+                </div>
+
+                <div class="summary-group">
+                    <div class="summary-group-title">
+                        <span>Tickers without Volume</span>
+                        <span id="sum-missing-vol-cnt" style="font-weight: 700; color: #fbbf24;">0</span>
+                    </div>
+                    <div class="summary-tags" id="sum-missing-vol-list">--</div>
+                </div>
+
+                <div class="summary-group">
+                    <div class="summary-group-title">
+                        <span>Tickers without ADV20</span>
+                        <span id="sum-missing-adv-cnt" style="font-weight: 700; color: #fca5a5;">0</span>
+                    </div>
+                    <div class="summary-tags" id="sum-missing-adv-list">--</div>
+                </div>
+            </div>
+
+            <!-- Warnings & Errors (W/E) Log Card -->
+            <div class="trouble-card">
+                <h3>⚠️ Warnings & Errors (W/E) <span id="lbl-we-count" style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">0 items</span></h3>
+                <div class="logs-table-container" id="logs-container">
+                    <div class="empty-state" style="padding: 2rem;">No warnings or errors recorded during last scan.</div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
-    <!-- Log Inspector Modal -->
-    <div class="modal-backdrop" id="modal-logs" onclick="closeLogsModalOnBackdrop(event)">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>📋 Scan Warnings & Errors Log</h2>
-                <button class="btn-close-modal" onclick="closeLogsModal()">✕</button>
-            </div>
-            <div class="modal-body">
-                <div class="modal-tabs">
-                    <button class="tab-btn active" id="tab-all" onclick="filterModalLogs('ALL')">All Logs (<span id="count-all">0</span>)</button>
-                    <button class="tab-btn" id="tab-warn" onclick="filterModalLogs('WARNING')">Warnings (<span id="count-warn">0</span>)</button>
-                    <button class="tab-btn" id="tab-err" onclick="filterModalLogs('ERROR')">Errors (<span id="count-err">0</span>)</button>
-                </div>
-                <div class="logs-list-container" id="logs-list-body">
-                    <div class="empty-state">No warnings or errors captured during scan.</div>
-                </div>
+    <!-- Test Scan Modal -->
+    <div class="modal-backdrop" id="modal-test">
+        <div class="modal-card">
+            <h3>🧪 Test Scan Mode</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                Enter a short list of comma-separated ticker symbols to test scan execution:
+            </p>
+            <textarea id="txt-test-tickers" placeholder="AAPL, NVDA, ALNY, TSLA, MOG A"></textarea>
+            <div class="modal-actions">
+                <button class="btn-action" onclick="closeTestModal()">Cancel</button>
+                <button class="btn-action btn-primary" onclick="executeTestScan()">Run Test Scan</button>
             </div>
         </div>
     </div>
 
     <script>
+        let userSelectedSession = null; // 'premarket' | 'postmarket' | null
+        let userOverrodeSession = false;
+        let isFullData = false;
+        let isAutoScanEnabled = false;
+        let isActiveLiveSession = false;
+        let isScanning = false;
+        let isTestScanning = false;
         let sortField = 'abs_change_pct';
         let sortAsc = false;
         let rawResults = [];
-        let rawLogs = [];
-        let currentLogFilter = 'ALL';
+        let lastCacheStatus = null;
+
+        function selectSession(sess) {
+            if (isScanning || isTestScanning || isAutoScanEnabled) return;
+            userSelectedSession = sess;
+            userOverrodeSession = true;
+            updateControlsState();
+            fetchScanResults();
+        }
+
+        function updateControlsState(data) {
+            if (data) {
+                isActiveLiveSession = !!data.is_active_live_session;
+                isScanning = !!data.is_scanning;
+                isAutoScanEnabled = !!data.is_auto_scan_enabled;
+
+                // Rule 1: Auto-select during live hours; deselect both outside live hours unless user manually selected
+                if (!userOverrodeSession) {
+                    if (isActiveLiveSession && (data.session_type === 'premarket' || data.session_type === 'postmarket')) {
+                        userSelectedSession = data.session_type;
+                    } else if (!isActiveLiveSession) {
+                        userSelectedSession = null;
+                    }
+                }
+            }
+
+            // Session selector buttons active status
+            const pmBtn = document.getElementById('btn-sess-pm');
+            const postBtn = document.getElementById('btn-sess-post');
+            if (pmBtn && postBtn) {
+                pmBtn.className = (userSelectedSession === 'premarket') ? 'session-btn active' : 'session-btn';
+                postBtn.className = (userSelectedSession === 'postmarket') ? 'session-btn active' : 'session-btn';
+
+                const disableSession = isScanning || isTestScanning || isAutoScanEnabled;
+                pmBtn.disabled = disableSession;
+                postBtn.disabled = disableSession;
+            }
+
+            const runBtn = document.getElementById('btn-run-scan');
+            const autoBtn = document.getElementById('btn-toggle-auto');
+            const testBtn = document.getElementById('btn-test-scan');
+
+            let isWarmed = false;
+            if (data && data.cache_status) {
+                lastCacheStatus = data.cache_status;
+            }
+            if (lastCacheStatus) {
+                const activeSess = userSelectedSession || 'premarket';
+                const activeData = activeSess === 'postmarket' ? (lastCacheStatus.postmarket || {}) : (lastCacheStatus.premarket || {});
+                isWarmed = !!activeData.is_warmed;
+            }
+
+            // Run Scan Now Button: Only active during live session hours
+            if (isScanning) {
+                runBtn.disabled = true;
+                runBtn.innerText = '⏳ Running...';
+                runBtn.title = '';
+            } else if (!isActiveLiveSession) {
+                runBtn.disabled = true;
+                runBtn.innerText = '▶ Run Scan Now';
+                runBtn.title = 'Run Scan Now is only active during live session hours';
+            } else if (isAutoScanEnabled) {
+                runBtn.disabled = true;
+                runBtn.innerText = '▶ Run Scan Now';
+                runBtn.title = '';
+            } else if (!userSelectedSession) {
+                runBtn.disabled = true;
+                runBtn.innerText = '▶ Select Session First';
+                runBtn.title = '';
+            } else {
+                runBtn.disabled = false;
+                runBtn.innerText = '▶ Run Scan Now';
+                runBtn.title = '';
+            }
+
+            // Auto-Scan Button
+            if (!isActiveLiveSession) {
+                autoBtn.disabled = true; // Deactivate Auto-Scan outside Live Scan windows
+            } else if (isScanning || isTestScanning) {
+                autoBtn.disabled = true; // Deactivate during scan / test scan
+            } else {
+                autoBtn.disabled = false;
+            }
+
+            if (isAutoScanEnabled) {
+                autoBtn.innerText = '⚡ Auto-Scan 15s: ON';
+                autoBtn.className = 'btn-action btn-toggle-auto active';
+            } else {
+                autoBtn.innerText = '⚡ Auto-Scan 15s: OFF';
+                autoBtn.className = 'btn-action btn-toggle-auto';
+            }
+
+            // Test Scan Button: Requires warmed cache outside live session hours
+            if (isTestScanning) {
+                testBtn.disabled = true;
+                testBtn.innerText = '🧪 Testing...';
+                testBtn.title = '';
+            } else if (!isActiveLiveSession && !isWarmed) {
+                testBtn.disabled = true;
+                testBtn.innerText = '🧪 Test Scan';
+                testBtn.title = 'Test Scan requires a warmed session cache when market is closed';
+            } else if (isScanning || isAutoScanEnabled || !userSelectedSession) {
+                testBtn.disabled = true;
+                testBtn.innerText = '🧪 Test Scan';
+                testBtn.title = '';
+            } else {
+                testBtn.disabled = false;
+                testBtn.innerText = '🧪 Test Scan';
+                testBtn.title = '';
+            }
+
+            // Reload Cache Button State
+            const reloadBtn = document.getElementById('btn-reload-cache');
+            if (reloadBtn) {
+                if (isScanning || isTestScanning) {
+                    reloadBtn.disabled = true;
+                    reloadBtn.innerText = '⏳ Reloading...';
+                    reloadBtn.style.opacity = '0.5';
+                    reloadBtn.style.cursor = 'not-allowed';
+                } else {
+                    reloadBtn.disabled = false;
+                    reloadBtn.innerText = '🗑️ Reload';
+                    reloadBtn.style.opacity = '1.0';
+                    reloadBtn.style.cursor = 'pointer';
+                }
+            }
+        }
+
+        function toggleFullData() {
+            isFullData = !isFullData;
+            const container = document.getElementById('movers-container');
+            const btn = document.getElementById('btn-toggle-full');
+
+            if (isFullData) {
+                container.classList.add('full-data-active');
+                btn.innerText = '📊 Full Data: ON';
+                btn.className = 'btn-action btn-primary';
+            } else {
+                container.classList.remove('full-data-active');
+                btn.innerText = '📊 Full Data: OFF';
+                btn.className = 'btn-action';
+            }
+        }
+
+        async function restoreFullResults() {
+            if (isScanning || isTestScanning) return;
+            const targetSess = userSelectedSession || 'premarket';
+            try {
+                await fetch('/api/restore-full-results', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session: targetSess })
+                });
+                await fetchScanResults();
+            } catch (err) {
+                console.error("Error restoring full scan results:", err);
+            }
+        }
+
+        async function reloadCache() {
+            if (isScanning || isTestScanning) return;
+            const targetSess = userSelectedSession || 'premarket';
+            if (!confirm(`Invalidate ${targetSess.toUpperCase()} cache and run a fresh scan from IBKR?`)) {
+                return;
+            }
+
+            isScanning = true;
+            updateControlsState();
+
+            try {
+                await fetch('/api/reload-cache', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session: targetSess })
+                });
+                await fetchScanResults();
+            } catch (err) {
+                console.error("Error reloading cache:", err);
+                isScanning = false;
+                updateControlsState();
+            }
+        }
+
+        async function toggleAutoScan() {
+            if (!isActiveLiveSession || isScanning || isTestScanning) return;
+            try {
+                const targetState = !isAutoScanEnabled;
+                await fetch('/api/toggle-autoscan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: targetState })
+                });
+                await fetchScanResults();
+            } catch (err) {
+                console.error("Error toggling auto scan:", err);
+            }
+        }
+
+        async function runManualScan() {
+            if (isScanning || isTestScanning || isAutoScanEnabled || !userSelectedSession) return;
+            
+            isScanning = true;
+            updateControlsState();
+
+            try {
+                await fetch('/api/run-scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ selected_session: userSelectedSession })
+                });
+                await fetchScanResults();
+            } catch (err) {
+                console.error("Error triggering manual scan:", err);
+            } finally {
+                isScanning = false;
+                updateControlsState();
+            }
+        }
+
+        function openTestModal() {
+            if (isScanning || isTestScanning || isAutoScanEnabled || !userSelectedSession) return;
+            document.getElementById('modal-test').classList.add('active');
+        }
+
+        function closeTestModal() {
+            document.getElementById('modal-test').classList.remove('active');
+        }
+
+        async function executeTestScan() {
+            const txt = document.getElementById('txt-test-tickers').value;
+            const tickers = txt.split(',').map(t => t.strip ? t.strip() : t.trim()).filter(t => t);
+            closeTestModal();
+
+            if (!tickers.length || !userSelectedSession) return;
+
+            isTestScanning = true;
+            updateControlsState();
+
+            try {
+                await fetch('/api/run-scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ selected_session: userSelectedSession, custom_tickers: tickers })
+                });
+                await fetchScanResults();
+            } catch (err) {
+                console.error("Error executing test scan:", err);
+            } finally {
+                isTestScanning = false;
+                updateControlsState();
+            }
+        }
 
         async function fetchScanResults() {
             try {
-                const response = await fetch('/api/scan-results');
-                const data = await response.json();
-                
+                const sessionParam = userSelectedSession || 'premarket';
+                const res = await fetch('/api/scan-results?session=' + sessionParam);
+                const data = await res.json();
+
                 if (data.status === 'success') {
+                    // Update Market Status Badge
                     const statusText = data.market_status || 'Market Closed';
                     const statusBadge = document.getElementById('lbl-market-status');
                     statusBadge.innerText = statusText;
-                    
-                    const isGreenSession = (statusText === 'Premarket' || statusText === 'Postmarket');
-                    if (isGreenSession) {
-                        statusBadge.className = 'badge-live badge-active';
+                    if (data.is_active_live_session) {
+                        statusBadge.className = 'status-badge badge-live';
                     } else {
-                        statusBadge.className = 'badge-live badge-inactive';
+                        statusBadge.className = 'status-badge badge-gray';
                     }
 
-                    document.getElementById('stat-market-status').innerText = statusText;
-                    document.getElementById('stat-matches').innerText = data.total_matches;
-                    
-                    const lastScanEl = document.getElementById('stat-last-scan');
-                    if (data.last_scan_end_time_pt) {
-                        lastScanEl.innerText = `${data.last_scan_end_time_pt} (${data.last_scan_duration_sec}s)`;
-                    } else {
-                        lastScanEl.innerText = '--';
-                    }
-                    
-                    const ibEl = document.getElementById('stat-ibkr');
+                    // Update IBKR Connection Badge
+                    const ibBadge = document.getElementById('lbl-ibkr-status');
                     if (data.ib_connected) {
-                        ibEl.innerText = 'Connected';
-                        ibEl.className = 'stat-value status-connected';
+                        ibBadge.innerText = '🟢 IBKR Connected';
+                        ibBadge.className = 'status-badge badge-ibkr-connected';
                     } else {
-                        ibEl.innerText = 'Disconnected';
-                        ibEl.className = 'stat-value status-disconnected';
+                        ibBadge.innerText = '🔴 IBKR Disconnected';
+                        ibBadge.className = 'status-badge badge-ibkr-disconnected';
                     }
 
-                    const pauseBtn = document.getElementById('btn-toggle-pause');
-                    if (data.is_active_session) {
-                        pauseBtn.disabled = false;
-                        if (data.is_paused) {
-                            pauseBtn.innerText = '▶ Resume Scans';
-                            pauseBtn.className = 'btn-pause btn-resume';
-                        } else {
-                            pauseBtn.innerText = '⏸ Pause Scans';
-                            pauseBtn.className = 'btn-pause';
-                        }
-                    } else {
-                        pauseBtn.disabled = true;
-                        pauseBtn.innerText = '⏸ Pause Scans';
-                        pauseBtn.className = 'btn-pause';
+                    // Update Controls and Disable States
+                    updateControlsState(data);
+
+                    // Toggle Restore Full Scan Button Visibility
+                    const restoreBtn = document.getElementById('btn-restore-full');
+                    if (restoreBtn) {
+                        restoreBtn.style.display = data.is_test_view_active ? 'inline-block' : 'none';
                     }
 
-                    // Update Logs Stat Card
-                    rawLogs = data.scan_logs || [];
-                    const warnCount = data.warning_count || 0;
-                    const errCount = data.error_count || 0;
-                    const totalLogs = warnCount + errCount;
-                    
-                    const logsCountEl = document.getElementById('stat-logs-count');
-                    if (totalLogs === 0) {
-                        logsCountEl.innerText = '0';
-                        logsCountEl.className = 'stat-value';
-                    } else if (errCount > 0) {
-                        logsCountEl.innerText = `${warnCount}W / ${errCount}E`;
-                        logsCountEl.className = 'stat-value status-disconnected';
+                    // Update Metrics
+                    const activeSess = userSelectedSession || 'premarket';
+                    const cs = data.cache_status || {};
+                    const activeData = activeSess === 'postmarket' ? (cs.postmarket || {}) : (cs.premarket || {});
+
+                    // 1. Baseline Card
+                    const bEnd = data.baseline_end_time_pt || (activeData.last_warmed_pt ? activeData.last_warmed_pt : '--');
+                    document.getElementById('val-baseline-end').innerText = bEnd;
+
+                    const pcCnt = activeData.prev_closes_count || 0;
+                    const advCnt = activeData.adv20s_count || 0;
+                    document.getElementById('val-baseline-counts').innerText = `PC: ${pcCnt} | ADV: ${advCnt}`;
+
+                    // 2. Last Scan Card
+                    const durStr = data.last_scan_duration_sec ? `${data.last_scan_duration_sec}s` : '--';
+                    const endStr = data.last_scan_end_time_pt ? `@ ${data.last_scan_end_time_pt}` : '';
+                    document.getElementById('val-last-scan').innerText = `${durStr} ${endStr}`.trim();
+
+                    const cCnt = activeData.session_prices_count || 0;
+                    const vCnt = activeData.session_volumes_count || 0;
+                    document.getElementById('val-last-counts').innerText = `PC: ${pcCnt} | ADV: ${advCnt} | C: ${cCnt} | V: ${vCnt}`;
+
+                    // 3. Total Matches Card
+                    document.getElementById('val-total-matches').innerText = data.total_matches || 0;
+
+                    // Update Troubleshooting Last Scan Summary
+                    const summary = data.last_scan_summary || {};
+                    updateSummaryGroup('sum-missing-price', summary.missing_price);
+                    updateSummaryGroup('sum-missing-close', summary.missing_close);
+                    updateSummaryGroup('sum-missing-vol', summary.missing_volume);
+                    updateSummaryGroup('sum-missing-adv', summary.missing_adv20);
+
+                    // Update Warnings & Errors Logs
+                    const logs = data.logs || [];
+                    document.getElementById('lbl-we-count').innerText = `${logs.length} items`;
+                    const logsContainer = document.getElementById('logs-container');
+                    if (logs.length === 0) {
+                        logsContainer.innerHTML = `<div class="empty-state" style="padding: 2rem;">No warnings or errors recorded during last scan.</div>`;
                     } else {
-                        logsCountEl.innerText = `${warnCount} Warnings`;
-                        logsCountEl.className = 'stat-value status-warning';
+                        logsContainer.innerHTML = logs.map(l => `
+                            <div class="log-row">
+                                <span class="log-time">${l.timestamp}</span>
+                                <span class="${l.level === 'ERROR' ? 'log-level-err' : 'log-level-warn'}">${l.level}</span>
+                                <span>${escapeHtml(l.message)}</span>
+                            </div>
+                        `).join('');
                     }
 
-                    document.getElementById('count-all').innerText = totalLogs;
-                    document.getElementById('count-warn').innerText = warnCount;
-                    document.getElementById('count-err').innerText = errCount;
-
-                    renderModalLogs();
-
+                    // Update Results Table
                     rawResults = data.results || [];
-                    updateTopMovers();
                     renderTable();
                 }
             } catch (err) {
@@ -667,79 +1084,15 @@
             }
         }
 
-        function openLogsModal() {
-            document.getElementById('modal-logs').classList.add('active');
-        }
-
-        function closeLogsModal() {
-            document.getElementById('modal-logs').classList.remove('active');
-        }
-
-        function closeLogsModalOnBackdrop(event) {
-            if (event.target.id === 'modal-logs') {
-                closeLogsModal();
-            }
-        }
-
-        function filterModalLogs(filter) {
-            currentLogFilter = filter;
-            document.getElementById('tab-all').className = (filter === 'ALL') ? 'tab-btn active' : 'tab-btn';
-            document.getElementById('tab-warn').className = (filter === 'WARNING') ? 'tab-btn active' : 'tab-btn';
-            document.getElementById('tab-err').className = (filter === 'ERROR') ? 'tab-btn active' : 'tab-btn';
-            renderModalLogs();
-        }
-
-        function renderModalLogs() {
-            const container = document.getElementById('logs-list-body');
-            if (!rawLogs || rawLogs.length === 0) {
-                container.innerHTML = `<div class="empty-state">No warnings or errors captured.</div>`;
-                return;
-            }
-
-            let filtered = rawLogs;
-            if (currentLogFilter === 'WARNING') {
-                filtered = rawLogs.filter(l => l.level === 'WARNING');
-            } else if (currentLogFilter === 'ERROR') {
-                filtered = rawLogs.filter(l => l.level === 'ERROR');
-            }
-
-            if (filtered.length === 0) {
-                container.innerHTML = `<div class="empty-state">No ${currentLogFilter.toLowerCase()} entries found.</div>`;
-                return;
-            }
-
-            container.innerHTML = filtered.map(item => {
-                const badgeClass = item.level === 'ERROR' ? 'badge-error' : 'badge-warning';
-                return `
-                    <div class="log-item">
-                        <span class="log-time">${item.timestamp}</span>
-                        <span class="log-badge ${badgeClass}">${item.level}</span>
-                        <span class="log-message">${escapeHtml(item.message)}</span>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function updateTopMovers() {
-            if (!rawResults || rawResults.length === 0) {
-                document.getElementById('stat-top-gainer').innerText = '--';
-                document.getElementById('stat-top-loser').innerText = '--';
-                return;
-            }
-
-            const gainers = rawResults.filter(r => r.price_change_pct > 0).sort((a, b) => b.price_change_pct - a.price_change_pct);
-            const losers = rawResults.filter(r => r.price_change_pct < 0).sort((a, b) => a.price_change_pct - b.price_change_pct);
-
-            if (gainers.length > 0) {
-                document.getElementById('stat-top-gainer').innerText = `${gainers[0].symbol} +${gainers[0].price_change_pct.toFixed(2)}%`;
+        function updateSummaryGroup(prefix, itemData) {
+            if (!itemData) return;
+            document.getElementById(`${prefix}-cnt`).innerText = itemData.count || 0;
+            const listEl = document.getElementById(`${prefix}-list`);
+            const list = itemData.list || [];
+            if (list.length === 0) {
+                listEl.innerHTML = `--`;
             } else {
-                document.getElementById('stat-top-gainer').innerText = '--';
-            }
-
-            if (losers.length > 0) {
-                document.getElementById('stat-top-loser').innerText = `${losers[0].symbol} ${losers[0].price_change_pct.toFixed(2)}%`;
-            } else {
-                document.getElementById('stat-top-loser').innerText = '--';
+                listEl.innerHTML = list.map(sym => `<span class="summary-tag">${sym}</span>`).join('');
             }
         }
 
@@ -748,24 +1101,24 @@
                 sortAsc = !sortAsc;
             } else {
                 sortField = field;
-                sortAsc = (field === 'symbol'); // default A-Z for symbol, DESC for numbers
+                sortAsc = (field === 'symbol');
             }
             updateSortHeaders();
             renderTable();
         }
 
         function updateSortHeaders() {
-            const fields = ['symbol', 'price', 'price_change_pct', 'volume', 'rel_volume_pct'];
+            const fields = ['symbol', 'price_change_pct', 'rel_volume_pct', 'price', 'prev_close', 'volume', 'adv'];
             fields.forEach(f => {
                 const th = document.getElementById(`th-${f}`);
                 const icon = document.getElementById(`icon-${f}`);
                 if (!th || !icon) return;
 
                 if (f === sortField) {
-                    th.className = 'active-sort';
+                    th.className = 'active-sort' + (f !== 'symbol' && f !== 'price_change_pct' && f !== 'rel_volume_pct' ? ' col-full' : '');
                     icon.innerText = sortAsc ? '▲' : '▼';
                 } else {
-                    th.className = '';
+                    th.className = (f !== 'symbol' && f !== 'price_change_pct' && f !== 'rel_volume_pct' ? 'col-full' : '');
                     icon.innerText = '↕';
                 }
             });
@@ -773,8 +1126,9 @@
 
         function renderTable() {
             const tbody = document.getElementById('table-body');
+            const colCount = isFullData ? 8 : 4;
             if (!rawResults || rawResults.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No stocks currently matching mover criteria (|%Change| ≥ 2.0% & Rel Vol ≥ 5.0%)</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="${colCount}" class="empty-state">No stocks currently matching mover criteria (|%Change| ≥ 2.0% & Rel Vol ≥ 5.0%)</td></tr>`;
                 return;
             }
 
@@ -782,6 +1136,8 @@
             sorted.sort((a, b) => {
                 let valA = a[sortField];
                 let valB = b[sortField];
+                if (valA === undefined) valA = 0;
+                if (valB === undefined) valB = 0;
 
                 if (typeof valA === 'string') {
                     return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
@@ -808,10 +1164,14 @@
                 return `
                     <tr>
                         <td class="symbol-cell">${item.symbol}</td>
-                        <td class="price-cell">$${item.price.toFixed(2)}</td>
                         <td><span class="pct-cell ${pctClass}">${sign}${item.price_change_pct.toFixed(2)}%</span></td>
-                        <td class="vol-cell">${item.volume.toLocaleString()}</td>
                         <td class="vol-cell">${item.rel_volume_pct.toFixed(1)}%</td>
+                        
+                        <td class="col-full price-cell">$${item.price.toFixed(2)}</td>
+                        <td class="col-full price-cell">$${item.prev_close.toFixed(2)}</td>
+                        <td class="col-full vol-cell">${item.volume.toLocaleString()}</td>
+                        <td class="col-full vol-cell">${item.adv.toLocaleString()}</td>
+                        
                         <td>${newsHtml}</td>
                     </tr>
                 `;
@@ -822,19 +1182,6 @@
             if (!text) return '';
             return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         }
-
-        async function togglePause() {
-            try {
-                await fetch('/api/toggle-pause', { method: 'POST' });
-                await fetchScanResults();
-            } catch (err) {
-                console.error("Error toggling pause state:", err);
-            }
-        }
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeLogsModal();
-        });
 
         // Poll API every 3 seconds
         fetchScanResults();

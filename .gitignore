@@ -12,6 +12,8 @@ token.json
 *.log
 app.log
 qualified_contracts.json
+*_cache.json
+scan_cache.json
 
 # IDE & OS files
 .idea/

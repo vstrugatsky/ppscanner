@@ -7,6 +7,7 @@ from ib_client import IBClientManager
 from gmail_client import GmailClientManager
 from briefing_news import BriefingNewsClient
 from premarket_scanner import PremarketScanner
+from scheduler import ScanScheduler
 from web_server import create_app
 
 logging.basicConfig(
@@ -16,30 +17,25 @@ logging.basicConfig(
 logger = logging.getLogger("main")
 
 
-async def scanner_loop(scanner: PremarketScanner):
-    """Continuous scanner loop running scans with only a few seconds pause during active hours."""
-    logger.info("Starting PP Scanner Loop...")
-    
-    # Run initial scan at boot
-    try:
-        await scanner.scan(force=True)
-    except Exception as e:
-        logger.error("Error during initial scan: %s", e)
+async def scanner_auto_loop(scanner: PremarketScanner):
+    """
+    Continuous background scanner loop.
+    During Live Scan windows (01:00-06:30 PT or 13:00-17:00 PT), if continuous auto-scan is enabled,
+    runs scans with 15-second intervals as required by the spec.
+    """
+    logger.info("Starting PP Scanner Background Auto-Loop...")
 
     while True:
         try:
-            session_name, is_active, should_auto_scan = scanner.get_market_status()
-            if is_active:
-                if not scanner.is_paused and (should_auto_scan or scanner.user_resumed):
-                    await scanner.scan()
-                    await asyncio.sleep(3)  # Brief pause between scans during active hours
-                else:
-                    await asyncio.sleep(5)
+            status_str, is_live_session, active_session = scanner.get_market_status()
+            if is_live_session and scanner.is_auto_scan_enabled:
+                if not scanner.is_scanning:
+                    await scanner.scan(selected_session=active_session)
+                await asyncio.sleep(15)  # Spec: 15-second intervals during Live Scan windows
             else:
-                scanner.user_resumed = False
-                await asyncio.sleep(5)  # Re-check status during off-hours
+                await asyncio.sleep(5)
         except Exception as e:
-            logger.error("Unhandled error in scanner loop: %s", e)
+            logger.error("Unhandled error in background scanner loop: %s", e)
             await asyncio.sleep(10)
 
 
@@ -49,22 +45,33 @@ def main():
 
     ib_manager = IBClientManager(config)
     gmail_manager = GmailClientManager(config.gmail)
-    briefing_client = BriefingNewsClient(gmail_manager, config.briefing)
+    briefing_client = BriefingNewsClient(gmail_manager)
 
     scanner = PremarketScanner(config, ib_manager, briefing_client)
+    prewarmer = ScanScheduler(scanner, config)
 
     app = create_app(config, ib_manager, scanner)
 
     @app.on_event("startup")
     async def startup_event():
-        # Authenticate Gmail
-        try:
-            await gmail_manager.authenticate_async()
-        except Exception as e:
-            logger.warning("Gmail authentication error: %s", e)
+        async def _init_services():
+            # Authenticate Gmail asynchronously
+            try:
+                await gmail_manager.authenticate_async()
+            except Exception as e:
+                logger.warning("Gmail authentication error: %s", e)
 
-        # Launch continuous scanner loop in background
-        asyncio.create_task(scanner_loop(scanner))
+            # Connect to IBKR
+            try:
+                await ib_manager.connect()
+            except Exception as e:
+                logger.warning("Initial IBKR connection error: %s", e)
+
+            # Launch continuous scanner loop & prewarmer scheduler in background
+            asyncio.create_task(scanner_auto_loop(scanner))
+            asyncio.create_task(prewarmer.start())
+
+        asyncio.create_task(_init_services())
 
     logger.info("=== Service Ready! Access Live Dashboard at http://localhost:8000 ===")
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
