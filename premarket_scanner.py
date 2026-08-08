@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import math
 from datetime import date, datetime, time, timedelta
@@ -11,6 +10,7 @@ from briefing_news import BriefingNewsClient
 from cache_manager import CacheManager
 from config import PT_TZ, Config
 from ib_client import IBClientManager
+from session_store import SessionStoreManager, create_empty_summary
 
 logger = logging.getLogger("premarket_scanner")
 logger.setLevel(logging.INFO)
@@ -49,19 +49,26 @@ scan_log_buffer.setLevel(logging.INFO)
 logger.addHandler(scan_log_buffer)
 
 
-def get_prev_market_day(d: date) -> date:
-    """Helper to return the previous weekday market date."""
-    cur = d - timedelta(days=1)
-    while cur.weekday() >= 5:  # Skip Sat (5) and Sun (6)
+def get_previous_trading_day(d: date | datetime) -> date:
+    """Returns the previous trading weekday date (skipping Sat/Sun)."""
+    cur = d.date() if isinstance(d, datetime) else d
+    cur -= timedelta(days=1)
+    while cur.weekday() >= 5:  # 5=Sat, 6=Sun
         cur -= timedelta(days=1)
     return cur
 
 
-def get_previous_trading_day(ref_dt: datetime) -> date:
-    d = ref_dt.date() - timedelta(days=1)
-    while d.weekday() >= 5:  # 5=Sat, 6=Sun
-        d -= timedelta(days=1)
-    return d
+def _extract_ticker_price(ticker: Any) -> float:
+    """Safely extracts live market price or last price from IBKR ticker."""
+    try:
+        mp = ticker.marketPrice()
+        if mp and not math.isnan(mp) and mp > 0:
+            return float(mp)
+        if ticker.last and not math.isnan(ticker.last) and ticker.last > 0:
+            return float(ticker.last)
+    except Exception:
+        pass
+    return 0.0
 
 
 async def _warmup_ibkr_connection(ib, contracts: list[Contract]):
@@ -80,10 +87,64 @@ async def _warmup_ibkr_connection(ib, contracts: list[Contract]):
         logger.debug("Warmup probe exception (safe to ignore): %s", e)
 
 
+async def req_historical_data_with_retry(
+    ib,
+    hist_sem: asyncio.Semaphore,
+    contract: Contract,
+    endDateTime: str,
+    durationStr: str,
+    barSizeSetting: str,
+    whatToShow: str,
+    useRTH: bool,
+    timeout_sec: float,
+    max_attempts: int = 3,
+):
+    """Module-level standardized historical data requester with retries and concurrency control."""
+    hist_c = Stock(contract.symbol, "SMART", "USD", conId=contract.conId)
+    for attempt in range(1, max_attempts + 1):
+        try:
+            async with hist_sem:
+                bars = await asyncio.wait_for(
+                    ib.reqHistoricalDataAsync(
+                        hist_c,
+                        endDateTime=endDateTime,
+                        durationStr=durationStr,
+                        barSizeSetting=barSizeSetting,
+                        whatToShow=whatToShow,
+                        useRTH=useRTH,
+                        formatDate=1,
+                    ),
+                    timeout=timeout_sec,
+                )
+                if bars and len(bars) > 0:
+                    return bars
+        except TimeoutError:
+            logger.warning(
+                "⏱️ Timeout (%.1fs) fetching historical bars for %s (Attempt %d/%d)",
+                timeout_sec,
+                contract.symbol,
+                attempt,
+                max_attempts,
+            )
+        except Exception as e:
+            logger.warning(
+                "Error fetching historical bars for %s (Attempt %d/%d): %s",
+                contract.symbol,
+                attempt,
+                max_attempts,
+                e,
+            )
+
+        if attempt < max_attempts:
+            sleep_sec = min(2.0 + (attempt - 1) * 1.0, 5.0)
+            await asyncio.sleep(sleep_sec)
+
+    return []
+
+
 class PremarketScanner:
     """
-    Core scanning engine supporting:
-    Premarket Live, Premarket Historical, Postmarket Live, and Postmarket Historical scans.
+    Core scanning engine supporting Premarket and Postmarket baseline reloading and live snapshot scans.
     """
 
     def __init__(
@@ -106,23 +167,12 @@ class PremarketScanner:
         }
         self.last_scan_start_time: datetime | None = None
         self.last_scan_end_time: datetime | None = None
-        self.first_scan_duration_sec: float | None = None
         self.last_scan_duration_sec: float | None = None
 
         # Diagnostics & Last Scan Summary per session
         self.last_scan_summary: dict[str, dict[str, Any]] = {
-            "premarket": {
-                "missing_price": {"count": 0, "list": []},
-                "missing_close": {"count": 0, "list": []},
-                "missing_volume": {"count": 0, "list": []},
-                "missing_adv20": {"count": 0, "list": []},
-            },
-            "postmarket": {
-                "missing_price": {"count": 0, "list": []},
-                "missing_close": {"count": 0, "list": []},
-                "missing_volume": {"count": 0, "list": []},
-                "missing_adv20": {"count": 0, "list": []},
-            },
+            "premarket": create_empty_summary(),
+            "postmarket": create_empty_summary(),
         }
 
         # Test Scan Result Isolation State
@@ -135,74 +185,30 @@ class PremarketScanner:
             "postmarket": False,
         }
 
-        # Durable Scan Results Persistence File & Store
+        # Durable Scan Results Persistence Store Manager
         self.scan_results_file = config.scan_results_file
-        self.session_store: dict[str, dict[str, Any]] = self._load_scan_results_store()
-
-    def _load_scan_results_store(self) -> dict[str, dict[str, Any]]:
-        default_store = {
-            "premarket": {
-                "target_date": None,
-                "prev_close_date": None,
-                "baseline_end_time_pt": None,
-                "last_scan_end_time_pt": None,
-                "last_scan_duration_sec": None,
-                "prev_closes_count": 0,
-                "adv20s_count": 0,
-                "session_prices_count": 0,
-                "session_volumes_count": 0,
-                "matches": [],
-                "last_scan_summary": {
-                    "missing_price": {"count": 0, "list": []},
-                    "missing_close": {"count": 0, "list": []},
-                    "missing_volume": {"count": 0, "list": []},
-                    "missing_adv20": {"count": 0, "list": []},
-                },
-                "logs": [],
-            },
-            "postmarket": {
-                "target_date": None,
-                "prev_close_date": None,
-                "baseline_end_time_pt": None,
-                "last_scan_end_time_pt": None,
-                "last_scan_duration_sec": None,
-                "prev_closes_count": 0,
-                "adv20s_count": 0,
-                "session_prices_count": 0,
-                "session_volumes_count": 0,
-                "matches": [],
-                "last_scan_summary": {
-                    "missing_price": {"count": 0, "list": []},
-                    "missing_close": {"count": 0, "list": []},
-                    "missing_volume": {"count": 0, "list": []},
-                    "missing_adv20": {"count": 0, "list": []},
-                },
-                "logs": [],
-            },
-        }
-        if self.scan_results_file.exists():
-            try:
-                with open(self.scan_results_file, encoding="utf-8") as f:
-                    data = json.load(f)
-                    for sess in ("premarket", "postmarket"):
-                        if sess in data:
-                            default_store[sess].update(data[sess])
-            except Exception as e:
-                logger.error("Failed to load scan_results.json: %s", e)
-        return default_store
+        self.session_store_manager = SessionStoreManager(config.scan_results_file)
+        self.session_store: dict[str, dict[str, Any]] = self.session_store_manager.store
 
     def _save_scan_results_store(self):
-        try:
-            with open(self.scan_results_file, "w", encoding="utf-8") as f:
-                json.dump(self.session_store, f, indent=2)
-        except Exception as e:
-            logger.error("Failed to save scan_results.json: %s", e)
+        self.session_store_manager.save()
 
     def restore_full_results(self, session_type: str = "premarket"):
         sess = (
             session_type if session_type in ("premarket", "postmarket") else "premarket"
         )
         self.is_test_view_active[sess] = False
+
+    async def _get_target_contracts(
+        self, custom_tickers: list[str] | None = None
+    ) -> list[Contract]:
+        all_contracts = await self.ib_manager.load_or_qualify_contracts()
+        if not custom_tickers:
+            return all_contracts
+        clean_custom = {
+            t.strip().upper().replace(".", " ") for t in custom_tickers if t.strip()
+        }
+        return [c for c in all_contracts if c.symbol in clean_custom]
 
     async def reload_baseline_cache(
         self, selected_session: str = "premarket"
@@ -218,12 +224,7 @@ class PremarketScanner:
             else "premarket"
         )
 
-        empty_summary = {
-            "missing_price": {"count": 0, "list": []},
-            "missing_close": {"count": 0, "list": []},
-            "missing_volume": {"count": 0, "list": []},
-            "missing_adv20": {"count": 0, "list": []},
-        }
+        empty_summary = create_empty_summary()
         self.last_scan_summary[sess] = empty_summary
         if sess in self.session_store:
             self.session_store[sess]["last_scan_summary"] = empty_summary
@@ -244,7 +245,7 @@ class PremarketScanner:
                     return {"status": "error", "message": "IBKR connection failed"}
 
             all_contracts = await self.ib_manager.load_or_qualify_contracts()
-            hist_sem = asyncio.Semaphore(5)
+            hist_sem = asyncio.Semaphore(self.config.ib.hist_max_concurrent_requests)
             ib = self.ib_manager.ib
 
             if len(all_contracts) > 20:
@@ -253,8 +254,7 @@ class PremarketScanner:
             prev_closes: dict[str, float] = {}
             adv20s: dict[str, float] = {}
 
-            def _clean_contract(c: Contract) -> Contract:
-                return Stock(c.symbol, "SMART", "USD", conId=c.conId)
+            current_summary = create_empty_summary()
 
             async def _get_prev_close_and_adv20(contract):
                 sym = contract.symbol
@@ -263,62 +263,64 @@ class PremarketScanner:
                     if sess == "postmarket"
                     else f"{target_date_str} 00:00:00 US/Eastern"
                 )
-                hist_c = _clean_contract(contract)
-                for attempt in range(1, 4):
-                    try:
-                        async with hist_sem:
-                            bars = await asyncio.wait_for(
-                                ib.reqHistoricalDataAsync(
-                                    hist_c,
-                                    endDateTime=end_time_str,
-                                    durationStr="25 D",
-                                    barSizeSetting="1 day",
-                                    whatToShow="TRADES",
-                                    useRTH=True,
-                                    formatDate=1,
-                                ),
-                                timeout=self.config.ib.hist_rth_timeout_sec,
-                            )
-                            if bars and len(bars) > 0:
-                                if bars[-1].close and bars[-1].close > 0:
-                                    pc = float(bars[-1].close)
-                                    self.cache_manager.set_prev_close(
-                                        sess, prev_close_date_str, sym, pc
-                                    )
-                                    prev_closes[sym] = pc
+                bars = await req_historical_data_with_retry(
+                    ib,
+                    hist_sem,
+                    contract,
+                    endDateTime=end_time_str,
+                    durationStr="25 D",
+                    barSizeSetting="1 day",
+                    whatToShow="TRADES",
+                    useRTH=True,
+                    timeout_sec=self.config.ib.hist_rth_timeout_sec,
+                    max_attempts=3,
+                )
+                if bars:
+                    if bars[-1].close and bars[-1].close > 0:
+                        pc = float(bars[-1].close)
+                        self.cache_manager.set_prev_close(
+                            sess, prev_close_date_str, sym, pc
+                        )
+                        prev_closes[sym] = pc
+                    else:
+                        current_summary["missing_close"]["list"].append(sym)
 
-                                vols = [
-                                    b.volume
-                                    for b in bars
-                                    if b.volume is not None and b.volume >= 0
-                                ]
-                                vols20 = vols[-20:] if len(vols) >= 20 else vols
-                                if vols20:
-                                    adv = sum(vols20) / float(len(vols20))
-                                    if adv > 0:
-                                        self.cache_manager.set_adv20(
-                                            sess, prev_close_date_str, sym, adv
-                                        )
-                                        adv20s[sym] = adv
-                                break
-                    except TimeoutError:
+                    vols = [
+                        b.volume for b in bars if b.volume is not None and b.volume >= 0
+                    ]
+                    if len(vols) < 20:
                         logger.warning(
-                            "⏱️ Timeout fetching baseline bars for %s (Attempt %d/3)",
+                            "Fewer than 20 daily volume bars (%d) returned for %s ADV20 calculation",
+                            len(vols),
                             sym,
-                            attempt,
                         )
-                    except Exception as e:
-                        logger.warning(
-                            "Error fetching baseline bars for %s (Attempt %d/3): %s",
-                            sym,
-                            attempt,
-                            e,
-                        )
-                    if attempt < 3:
-                        sleep_sec = min(2.0 + (attempt - 1) * 1.0, 5.0)
-                        await asyncio.sleep(sleep_sec)
+                    vols20 = vols[-20:] if len(vols) >= 20 else vols
+                    if vols20:
+                        adv = sum(vols20) / float(len(vols20))
+                        if adv > 0:
+                            self.cache_manager.set_adv20(
+                                sess, prev_close_date_str, sym, adv
+                            )
+                            adv20s[sym] = adv
+                        else:
+                            current_summary["missing_adv20"]["list"].append(sym)
+                    else:
+                        current_summary["missing_adv20"]["list"].append(sym)
+                else:
+                    current_summary["missing_close"]["list"].append(sym)
+                    current_summary["missing_adv20"]["list"].append(sym)
 
             await asyncio.gather(*[_get_prev_close_and_adv20(c) for c in all_contracts])
+
+            current_summary["missing_close"]["count"] = len(
+                current_summary["missing_close"]["list"]
+            )
+            current_summary["missing_adv20"]["count"] = len(
+                current_summary["missing_adv20"]["list"]
+            )
+
+            self.last_scan_summary[sess] = current_summary
+            self.session_store[sess]["last_scan_summary"] = current_summary
 
             end_dt = datetime.now(PT_TZ)
             b_time = end_dt.strftime("%I:%M:%S %p PT")
@@ -389,34 +391,11 @@ class PremarketScanner:
                 curr_target_date_str,
                 stored_target_date_str,
             )
-            self.session_store[sess] = {
-                "target_date": curr_target_date_str,
-                "prev_close_date": None,
-                "baseline_end_time_pt": None,
-                "last_scan_end_time_pt": None,
-                "last_scan_duration_sec": None,
-                "prev_closes_count": 0,
-                "adv20s_count": 0,
-                "session_prices_count": 0,
-                "session_volumes_count": 0,
-                "matches": [],
-                "last_scan_summary": {
-                    "missing_price": {"count": 0, "list": []},
-                    "missing_close": {"count": 0, "list": []},
-                    "missing_volume": {"count": 0, "list": []},
-                    "missing_adv20": {"count": 0, "list": []},
-                },
-                "logs": [],
-            }
-            self.last_scan_summary[sess] = {
-                "missing_price": {"count": 0, "list": []},
-                "missing_close": {"count": 0, "list": []},
-                "missing_volume": {"count": 0, "list": []},
-                "missing_adv20": {"count": 0, "list": []},
-            }
+            self.session_store_manager.reset_session(sess, curr_target_date_str)
+            self.session_store = self.session_store_manager.store
+            self.last_scan_summary[sess] = create_empty_summary()
             self.last_scan_results[sess] = []
             scan_log_buffer.clear()
-            self._save_scan_results_store()
             return True
 
         return False
@@ -467,25 +446,9 @@ class PremarketScanner:
         data["logs"] = all_logs
 
         if self.is_scanning:
-            raw_summary = self.last_scan_summary.get(
-                sess,
-                {
-                    "missing_price": {"count": 0, "list": []},
-                    "missing_close": {"count": 0, "list": []},
-                    "missing_volume": {"count": 0, "list": []},
-                    "missing_adv20": {"count": 0, "list": []},
-                },
-            )
+            raw_summary = self.last_scan_summary.get(sess, create_empty_summary())
         else:
-            raw_summary = data.get(
-                "last_scan_summary",
-                {
-                    "missing_price": {"count": 0, "list": []},
-                    "missing_close": {"count": 0, "list": []},
-                    "missing_volume": {"count": 0, "list": []},
-                    "missing_adv20": {"count": 0, "list": []},
-                },
-            )
+            raw_summary = data.get("last_scan_summary", create_empty_summary())
 
         processed_summary = {}
         for k, v in raw_summary.items():
@@ -524,7 +487,7 @@ class PremarketScanner:
         self, selected_session: str = "auto", now_pt: datetime | None = None
     ):
         """
-        Resolves whether scan is Live or Historical, the target session date D, and the previous close date.
+        Resolves target session type, whether the window is currently live, target date D, and previous close date.
         - selected_session: 'auto' | 'premarket' | 'postmarket'
         Returns: (session_type, is_live, target_date, prev_close_date)
         """
@@ -558,8 +521,8 @@ class PremarketScanner:
             elif weekday < 5 and t >= time(6, 30):
                 target_date = dt_date
             else:
-                target_date = get_prev_market_day(dt_date)
-            prev_close_date = get_prev_market_day(target_date)
+                target_date = get_previous_trading_day(dt_date)
+            prev_close_date = get_previous_trading_day(target_date)
 
         else:  # postmarket
             if is_live:
@@ -569,7 +532,7 @@ class PremarketScanner:
                 target_date = dt_date
                 prev_close_date = dt_date  # 16:00 ET RTH close of today
             else:
-                target_date = get_prev_market_day(dt_date)
+                target_date = get_previous_trading_day(dt_date)
                 prev_close_date = target_date  # 16:00 ET RTH close of target date
 
         return session_type, is_live, target_date, prev_close_date
@@ -600,17 +563,17 @@ class PremarketScanner:
                 )
             )
 
+            if not is_live and not is_test_scan:
+                logger.info(
+                    "Market session %s is currently off-hours. Returning stored session results.",
+                    session_type.capitalize(),
+                )
+                return self.session_store.get(session_type, {}).get("matches", [])
+
             # Reset diagnostic summary lists for current session_type
-            self.last_scan_summary[session_type] = {
-                "missing_price": {"count": 0, "list": []},
-                "missing_close": {"count": 0, "list": []},
-                "missing_volume": {"count": 0, "list": []},
-                "missing_adv20": {"count": 0, "list": []},
-            }
-            current_summary = self.last_scan_summary[session_type]
-            mode_name = (
-                f"{session_type.capitalize()} {'Live' if is_live else 'Historical'}"
-            )
+            current_summary = create_empty_summary()
+            self.last_scan_summary[session_type] = current_summary
+            mode_name = f"{session_type.capitalize()} Live Snapshot"
             logger.info(
                 "Starting %s scan (Target Date: %s, Prev Close Date: %s)",
                 mode_name,
@@ -625,19 +588,7 @@ class PremarketScanner:
                     return self.get_results_for_session(selected_session)
 
             # Load contracts
-            if custom_tickers:
-                clean_custom = [
-                    t.strip().upper().replace(".", " ")
-                    for t in custom_tickers
-                    if t.strip()
-                ]
-                all_contracts = [
-                    c
-                    for c in await self.ib_manager.load_or_qualify_contracts()
-                    if c.symbol in clean_custom
-                ]
-            else:
-                all_contracts = await self.ib_manager.load_or_qualify_contracts()
+            all_contracts = await self._get_target_contracts(custom_tickers)
 
             if not all_contracts:
                 logger.warning("No contracts available for scanning.")
@@ -648,64 +599,21 @@ class PremarketScanner:
             target_date_str = target_date.strftime("%Y%m%d")
             prev_close_date_str = prev_close_date.strftime("%Y%m%d")
 
-            # Helper for clean contract in historical requests
-            def _clean_contract(c: Contract) -> Contract:
-                return Stock(c.symbol, "SMART", "USD", conId=c.conId)
+            # Check baseline pre-warm status
+            is_warmed = self.cache_manager.is_warmed(session_type, target_date_str)
+            if not is_warmed and not is_test_scan:
+                logger.error(
+                    "❌ Baseline cache is not warmed for %s session on %s. Please run 'Reload Baseline' first.",
+                    session_type.capitalize(),
+                    target_date_str,
+                )
+                self.session_store[session_type]["logs"] = scan_log_buffer.get_logs()
+                self._save_scan_results_store()
+                return []
 
             # Warmup connection for large contract universes
             if not is_test_scan and len(all_contracts) > 20:
                 await _warmup_ibkr_connection(ib, all_contracts)
-
-            async def _req_historical_data_with_retry(
-                contract: Contract,
-                endDateTime: str,
-                durationStr: str,
-                barSizeSetting: str,
-                whatToShow: str,
-                useRTH: bool,
-                timeout_sec: float,
-                max_attempts: int = 3,
-            ):
-                hist_c = _clean_contract(contract)
-                for attempt in range(1, max_attempts + 1):
-                    try:
-                        async with hist_sem:
-                            bars = await asyncio.wait_for(
-                                ib.reqHistoricalDataAsync(
-                                    hist_c,
-                                    endDateTime=endDateTime,
-                                    durationStr=durationStr,
-                                    barSizeSetting=barSizeSetting,
-                                    whatToShow=whatToShow,
-                                    useRTH=useRTH,
-                                    formatDate=1,
-                                ),
-                                timeout=timeout_sec,
-                            )
-                            if bars and len(bars) > 0:
-                                return bars
-                    except TimeoutError:
-                        logger.warning(
-                            "⏱️ Timeout (%.1fs) fetching historical bars for %s (Attempt %d/%d)",
-                            timeout_sec,
-                            contract.symbol,
-                            attempt,
-                            max_attempts,
-                        )
-                    except Exception as e:
-                        logger.warning(
-                            "Error fetching historical bars for %s (Attempt %d/%d): %s",
-                            contract.symbol,
-                            attempt,
-                            max_attempts,
-                            e,
-                        )
-
-                    if attempt < max_attempts:
-                        sleep_sec = min(2.0 + (attempt - 1) * 1.0, 5.0)
-                        await asyncio.sleep(sleep_sec)
-
-                return []
 
             # Data collections
             prices: dict[str, float] = {}
@@ -714,9 +622,9 @@ class PremarketScanner:
             adv20s: dict[str, float] = {}
 
             # =========================================================================
-            # STEP 1: PREVIOUS CLOSE & ADV20 FETCHING (Cached per date)
+            # STEP 1: PREVIOUS CLOSE & ADV20 LOAD FROM CACHE
             # =========================================================================
-            async def _get_prev_close_and_adv20(contract):
+            for contract in all_contracts:
                 sym = contract.symbol
 
                 pc = self.cache_manager.get_prev_close(
@@ -725,57 +633,6 @@ class PremarketScanner:
                 adv = self.cache_manager.get_adv20(
                     session_type, prev_close_date_str, sym
                 )
-
-                if (pc is None or pc <= 0) or (adv is None or adv <= 0):
-                    end_time_str = (
-                        f"{prev_close_date_str} 16:00:00 US/Eastern"
-                        if session_type == "postmarket"
-                        else f"{target_date_str} 00:00:00 US/Eastern"
-                    )
-                    bars = await _req_historical_data_with_retry(
-                        contract,
-                        endDateTime=end_time_str,
-                        durationStr="25 D",
-                        barSizeSetting="1 day",
-                        whatToShow="TRADES",
-                        useRTH=True,
-                        timeout_sec=self.config.ib.hist_rth_timeout_sec,
-                        max_attempts=3,
-                    )
-                    if bars:
-                        if (
-                            (pc is None or pc <= 0)
-                            and bars[-1].close
-                            and bars[-1].close > 0
-                        ):
-                            pc = float(bars[-1].close)
-                            if not is_test_scan:
-                                self.cache_manager.set_prev_close(
-                                    session_type, prev_close_date_str, sym, pc
-                                )
-
-                        if adv is None or adv <= 0:
-                            vols = [
-                                b.volume
-                                for b in bars
-                                if b.volume is not None and b.volume >= 0
-                            ]
-                            if len(vols) < 20:
-                                logger.warning(
-                                    "Fewer than 20 daily volume bars (%d) returned for %s ADV20 calculation",
-                                    len(vols),
-                                    sym,
-                                )
-                            vols20 = vols[-20:] if len(vols) >= 20 else vols
-                            if vols20:
-                                adv = sum(vols20) / float(len(vols20))
-                                if adv > 0 and not is_test_scan:
-                                    self.cache_manager.set_adv20(
-                                        session_type,
-                                        prev_close_date_str,
-                                        sym,
-                                        adv,
-                                    )
 
                 if pc and pc > 0:
                     prev_closes[sym] = pc
@@ -837,19 +694,9 @@ class PremarketScanner:
                     all_tickers = [t for sublist in chunk_results for t in sublist if t]
 
                     for t in all_tickers:
-                        sym = t.contract.symbol.upper()
-                        price = 0.0
-                        try:
-                            mp = t.marketPrice()
-                            if mp and not math.isnan(mp) and mp > 0:
-                                price = float(mp)
-                            elif t.last and not math.isnan(t.last) and t.last > 0:
-                                price = float(t.last)
-                        except Exception:
-                            pass
-
+                        price = _extract_ticker_price(t)
                         if price > 0:
-                            prices[sym] = price
+                            prices[t.contract.symbol.upper()] = price
 
                     current_price_count = len(prices)
                     new_gains = current_price_count - prev_price_count
@@ -904,11 +751,7 @@ class PremarketScanner:
                     if c.symbol not in prices:
                         current_summary["missing_price"]["list"].append(c.symbol)
 
-                # Fetch Previous Close & ADV20 for candidates with price > 0
                 candidate_contracts = [c for c in all_contracts if c.symbol in prices]
-                await asyncio.gather(
-                    *[_get_prev_close_and_adv20(c) for c in candidate_contracts]
-                )
 
                 # Live Volume Fetching via 15-min bars for price-qualifying tickers
                 if candidate_contracts:
@@ -948,7 +791,9 @@ class PremarketScanner:
                                 end_time_str = f"{target_date_str} 20:00:00 US/Eastern"
                                 dur_str = "14400 S"  # 4.0 hours (16:00 to 20:00 ET)
 
-                            bars = await _req_historical_data_with_retry(
+                            bars = await req_historical_data_with_retry(
+                                ib,
+                                hist_sem,
                                 contract,
                                 endDateTime=end_time_str,
                                 durationStr=dur_str,
@@ -959,27 +804,21 @@ class PremarketScanner:
                                 max_attempts=3,
                             )
                             if bars:
-                                if session_type == "premarket":
-                                    session_vol = sum(
-                                        b.volume
-                                        for b in bars
-                                        if b.volume is not None
-                                        and b.volume >= 0
-                                        and b.date.date() == target_date
-                                        and (
-                                            b.date.hour < 9
-                                            or (b.date.hour == 9 and b.date.minute < 30)
-                                        )
-                                    )
-                                else:
-                                    session_vol = sum(
-                                        b.volume
-                                        for b in bars
-                                        if b.volume is not None
-                                        and b.volume >= 0
-                                        and b.date.date() == target_date
-                                        and b.date.hour >= 16
-                                    )
+
+                                def _is_session_bar(dt: datetime) -> bool:
+                                    if dt.date() != target_date:
+                                        return False
+                                    if session_type == "premarket":
+                                        return (dt.hour, dt.minute) < (9, 30)
+                                    return dt.hour >= 16
+
+                                session_vol = sum(
+                                    b.volume
+                                    for b in bars
+                                    if b.volume is not None
+                                    and b.volume >= 0
+                                    and _is_session_bar(b.date)
+                                )
 
                                 volumes[sym] = float(session_vol)
                                 if session_vol <= 0:
@@ -995,64 +834,18 @@ class PremarketScanner:
                             *[_fetch_live_eth_vol(c) for c in vol_contracts]
                         )
 
-            else:
-                # Off-Hours / Historical Scan (Premarket or Postmarket)
-                logger.info(
-                    "Running Off-Hours %s scan for date %s...",
-                    session_type.capitalize(),
-                    target_date_str,
-                )
-                await asyncio.gather(
-                    *[_get_prev_close_and_adv20(c) for c in all_contracts]
-                )
-
-                # Read session prices & volumes directly from persistent cache (no slow historical bar queries)
-                candidate_contracts = [
-                    c for c in all_contracts if c.symbol in prev_closes
-                ]
-                for c in candidate_contracts:
-                    sym = c.symbol
-                    hp = self.cache_manager.get_hist_price(
-                        session_type, target_date_str, sym
-                    )
-                    hv = self.cache_manager.get_hist_vol(
-                        session_type, target_date_str, sym
-                    )
-
-                    if hp and hp > 0:
-                        prices[sym] = hp
-                    else:
-                        current_summary["missing_price"]["list"].append(sym)
-
-                    if hv is not None and hv >= 0:
-                        volumes[sym] = float(hv)
-                        if hv == 0:
-                            current_summary["missing_volume"]["list"].append(sym)
-                    else:
-                        volumes[sym] = 0.0
-                        current_summary["missing_volume"]["list"].append(sym)
-
-            # Save updated cache and mark session as warmed if it is a full universe scan
-            if not is_test_scan:
-                if is_live:
-                    for sym, p in prices.items():
-                        if p > 0:
-                            self.cache_manager.set_hist_price(
-                                session_type, target_date_str, sym, p
-                            )
-                    for sym, v in volumes.items():
-                        if v >= 0:
-                            self.cache_manager.set_hist_vol(
-                                session_type, target_date_str, sym, v
-                            )
-
-                self.cache_manager.mark_warmed(
-                    session_type=session_type,
-                    target_date_str=target_date_str,
-                    prev_close_date_str=prev_close_date_str,
-                    count=len(all_contracts),
-                    is_scheduled=is_scheduled,
-                )
+            # Save live snapshot price and volume values to persistent cache
+            if not is_test_scan and is_live:
+                for sym, p in prices.items():
+                    if p > 0:
+                        self.cache_manager.set_hist_price(
+                            session_type, target_date_str, sym, p
+                        )
+                for sym, v in volumes.items():
+                    if v >= 0:
+                        self.cache_manager.set_hist_vol(
+                            session_type, target_date_str, sym, v
+                        )
 
             # Update summary counts
             for key in current_summary:
@@ -1129,8 +922,6 @@ class PremarketScanner:
             duration_sec = round((end_dt - start_dt).total_seconds(), 1)
             self.last_scan_end_time = end_dt
             self.last_scan_duration_sec = duration_sec
-            if self.first_scan_duration_sec is None:
-                self.first_scan_duration_sec = duration_sec
 
             if is_test_scan:
                 self.test_scan_results[session_type] = matches

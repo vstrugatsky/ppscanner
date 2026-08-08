@@ -63,7 +63,6 @@ def create_app(
             "is_auto_scan_enabled": scanner.is_auto_scan_enabled,
             "total_matches": len(sess_data.get("matches", [])),
             "baseline_end_time_pt": sess_data.get("baseline_end_time_pt"),
-            "first_scan_duration_sec": scanner.first_scan_duration_sec,
             "last_scan_duration_sec": sess_data.get("last_scan_duration_sec"),
             "last_scan_end_time_pt": sess_data.get("last_scan_end_time_pt"),
             "is_scanning": scanner.is_scanning,
