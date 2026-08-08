@@ -1,11 +1,12 @@
-import logging
 import asyncio
+import logging
+
 import uvicorn
 
-from config import Config
-from ib_client import IBClientManager
-from gmail_client import GmailClientManager
 from briefing_news import BriefingNewsClient
+from config import Config
+from gmail_client import GmailClientManager
+from ib_client import IBClientManager
 from premarket_scanner import PremarketScanner
 from scheduler import ScanScheduler
 from web_server import create_app
@@ -27,11 +28,16 @@ async def scanner_auto_loop(scanner: PremarketScanner):
 
     while True:
         try:
+            scanner.check_and_reset_obsolete_session_data("premarket")
+            scanner.check_and_reset_obsolete_session_data("postmarket")
+
             status_str, is_live_session, active_session = scanner.get_market_status()
             if is_live_session and scanner.is_auto_scan_enabled:
                 if not scanner.is_scanning:
                     await scanner.scan(selected_session=active_session)
-                await asyncio.sleep(15)  # Spec: 15-second intervals during Live Scan windows
+                await asyncio.sleep(
+                    15
+                )  # Spec: 15-second intervals during Live Scan windows
             else:
                 await asyncio.sleep(5)
         except Exception as e:

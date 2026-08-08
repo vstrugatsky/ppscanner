@@ -17,7 +17,7 @@ def load_tickers_from_file(file_path: Path) -> list[str]:
     try:
         content = file_path.read_text(encoding="utf-8")
         raw_items = [t.strip() for t in content.split(",") if t.strip()]
-        
+
         cleaned_tickers = []
         for symbol in raw_items:
             # Spec requirement: Replace periods with spaces for IBKR (e.g., MOG.A -> MOG A)
@@ -25,7 +25,11 @@ def load_tickers_from_file(file_path: Path) -> list[str]:
             if clean_sym and clean_sym not in cleaned_tickers:
                 cleaned_tickers.append(clean_sym)
 
-        logger.info("Loaded %d unique clean tickers from %s", len(cleaned_tickers), file_path.name)
+        logger.info(
+            "Loaded %d unique clean tickers from %s",
+            len(cleaned_tickers),
+            file_path.name,
+        )
         return cleaned_tickers
     except Exception as e:
         logger.error("Error reading tickers file %s: %s", file_path, e)

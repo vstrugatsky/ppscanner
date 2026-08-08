@@ -608,24 +608,29 @@
 
             <!-- Metrics Bar -->
             <div class="metrics-bar">
-                <div class="metric-item">
-                    <div class="metric-label">⚡ Baseline</div>
+                <div class="metric-item" style="position: relative;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <div class="metric-label">⚡ Baseline</div>
+                        <button id="btn-reload-cache" onclick="reloadCache()" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; cursor: pointer; transition: all 0.2s;" title="Reload Baseline data (Previous Close & ADV20)">
+                            🗑️ Reload Baseline
+                        </button>
+                    </div>
                     <div class="metric-value" id="val-baseline-end" style="font-size: 1.0rem; margin-top: 2px;">--</div>
                     <div class="metric-subtext" id="val-baseline-counts" style="font-size: 0.72rem; color: #a7f3d0; margin-top: 2px;">PC: -- | ADV: --</div>
                 </div>
-                <div class="metric-item" style="position: relative;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                        <div class="metric-label">📊 Last Scan</div>
-                        <button id="btn-reload-cache" onclick="reloadCache()" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; cursor: pointer; transition: all 0.2s;" title="Invalidate current session cache and force fresh scan">
-                            🗑️ Reload
-                        </button>
-                    </div>
+                <div class="metric-item">
+                    <div class="metric-label">📊 Last Scan</div>
                     <div class="metric-value" id="val-last-scan" style="font-size: 1.0rem; margin-top: 2px;">--</div>
                     <div class="metric-subtext" id="val-last-counts" style="font-size: 0.72rem; color: #a7f3d0; margin-top: 2px;">PC: -- | ADV: -- | C: -- | V: --</div>
                 </div>
                 <div class="metric-item">
                     <div class="metric-label">🎯 Total Matches</div>
                     <div class="metric-value" id="val-total-matches" style="font-size: 1.2rem;">0</div>
+                </div>
+                <div class="metric-item" onclick="openWEModal()" style="cursor: pointer; transition: background 0.2s;" title="Click to view detailed Warnings & Errors">
+                    <div class="metric-label">⚠️ Warnings & Errors</div>
+                    <div class="metric-value" id="val-we-counts" style="font-size: 1.1rem; color: #fca5a5;">0E / 0W</div>
+                    <div class="metric-subtext" style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">Click to view</div>
                 </div>
             </div>
         </div>
@@ -701,15 +706,31 @@
                 </div>
             </div>
 
-            <!-- Warnings & Errors (W/E) Log Card -->
+            <!-- Scan Log Card (INFO level progress logs) -->
             <div class="trouble-card">
-                <h3>⚠️ Warnings & Errors (W/E) <span id="lbl-we-count" style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">0 items</span></h3>
+                <h3>📋 Scan Log <span id="lbl-scan-log-count" style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">0 items</span></h3>
                 <div class="logs-table-container" id="logs-container">
-                    <div class="empty-state" style="padding: 2rem;">No warnings or errors recorded during last scan.</div>
+                    <div class="empty-state" style="padding: 2rem;">No scan logs recorded during last run.</div>
                 </div>
             </div>
         </div>
 
+    </div>
+
+    <!-- Warnings & Errors Modal -->
+    <div class="modal-backdrop" id="modal-we">
+        <div class="modal-card" style="max-width: 700px; width: 90%;">
+            <h3>⚠️ Warnings & Errors Details</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                List of warning and error events recorded during the scan execution:
+            </p>
+            <div class="logs-table-container" id="we-modal-logs-container" style="max-height: 350px; overflow-y: auto;">
+                <div class="empty-state" style="padding: 2rem;">No warnings or errors recorded.</div>
+            </div>
+            <div class="modal-actions" style="margin-top: 1rem;">
+                <button class="btn-action" onclick="closeWEModal()">Close</button>
+            </div>
+        </div>
     </div>
 
     <!-- Test Scan Modal -->
@@ -728,7 +749,7 @@
     </div>
 
     <script>
-        let userSelectedSession = null; // 'premarket' | 'postmarket' | null
+        let userSelectedSession = 'postmarket'; // 'premarket' | 'postmarket' (never null)
         let userOverrodeSession = false;
         let isFullData = false;
         let isAutoScanEnabled = false;
@@ -748,20 +769,25 @@
             fetchScanResults();
         }
 
+        let activeSessionType = null;
+
         function updateControlsState(data) {
             if (data) {
                 isActiveLiveSession = !!data.is_active_live_session;
                 isScanning = !!data.is_scanning;
                 isAutoScanEnabled = !!data.is_auto_scan_enabled;
+                activeSessionType = data.session_type;
 
-                // Rule 1: Auto-select during live hours; deselect both outside live hours unless user manually selected
-                if (!userOverrodeSession) {
-                    if (isActiveLiveSession && (data.session_type === 'premarket' || data.session_type === 'postmarket')) {
+                // Auto-select active session during live hours or active scans
+                if (!userOverrodeSession || isScanning) {
+                    if (data.session_type === 'premarket' || data.session_type === 'postmarket') {
                         userSelectedSession = data.session_type;
-                    } else if (!isActiveLiveSession) {
-                        userSelectedSession = null;
                     }
                 }
+            }
+
+            if (!userSelectedSession) {
+                userSelectedSession = 'postmarket';
             }
 
             // Session selector buttons active status
@@ -780,32 +806,29 @@
             const autoBtn = document.getElementById('btn-toggle-auto');
             const testBtn = document.getElementById('btn-test-scan');
 
-            let isWarmed = false;
-            if (data && data.cache_status) {
-                lastCacheStatus = data.cache_status;
-            }
-            if (lastCacheStatus) {
-                const activeSess = userSelectedSession || 'premarket';
-                const activeData = activeSess === 'postmarket' ? (lastCacheStatus.postmarket || {}) : (lastCacheStatus.premarket || {});
-                isWarmed = !!activeData.is_warmed;
-            }
+            // Check if current user-selected session is live now
+            const isSelectedSessionLive = !!(
+                userSelectedSession &&
+                isActiveLiveSession &&
+                userSelectedSession === activeSessionType
+            );
 
-            // Run Scan Now Button: Only active during live session hours
+            // Run Scan Now Button
             if (isScanning) {
                 runBtn.disabled = true;
                 runBtn.innerText = '⏳ Running...';
                 runBtn.title = '';
-            } else if (!isActiveLiveSession) {
-                runBtn.disabled = true;
-                runBtn.innerText = '▶ Run Scan Now';
-                runBtn.title = 'Run Scan Now is only active during live session hours';
-            } else if (isAutoScanEnabled) {
-                runBtn.disabled = true;
-                runBtn.innerText = '▶ Run Scan Now';
-                runBtn.title = '';
             } else if (!userSelectedSession) {
                 runBtn.disabled = true;
                 runBtn.innerText = '▶ Select Session First';
+                runBtn.title = '';
+            } else if (!isSelectedSessionLive) {
+                runBtn.disabled = true;
+                runBtn.innerText = '▶ Run Scan Now';
+                runBtn.title = `Scan buttons are active only during live hours for ${userSelectedSession.toUpperCase()}`;
+            } else if (isAutoScanEnabled) {
+                runBtn.disabled = true;
+                runBtn.innerText = '▶ Run Scan Now';
                 runBtn.title = '';
             } else {
                 runBtn.disabled = false;
@@ -814,10 +837,8 @@
             }
 
             // Auto-Scan Button
-            if (!isActiveLiveSession) {
-                autoBtn.disabled = true; // Deactivate Auto-Scan outside Live Scan windows
-            } else if (isScanning || isTestScanning) {
-                autoBtn.disabled = true; // Deactivate during scan / test scan
+            if (!isSelectedSessionLive || isScanning || isTestScanning) {
+                autoBtn.disabled = true;
             } else {
                 autoBtn.disabled = false;
             }
@@ -830,15 +851,15 @@
                 autoBtn.className = 'btn-action btn-toggle-auto';
             }
 
-            // Test Scan Button: Requires warmed cache outside live session hours
+            // Test Scan Button
             if (isTestScanning) {
                 testBtn.disabled = true;
                 testBtn.innerText = '🧪 Testing...';
                 testBtn.title = '';
-            } else if (!isActiveLiveSession && !isWarmed) {
+            } else if (!isSelectedSessionLive) {
                 testBtn.disabled = true;
                 testBtn.innerText = '🧪 Test Scan';
-                testBtn.title = 'Test Scan requires a warmed session cache when market is closed';
+                testBtn.title = `Test Scan is active only during live hours for ${userSelectedSession ? userSelectedSession.toUpperCase() : 'session'}`;
             } else if (isScanning || isAutoScanEnabled || !userSelectedSession) {
                 testBtn.disabled = true;
                 testBtn.innerText = '🧪 Test Scan';
@@ -859,10 +880,35 @@
                     reloadBtn.style.cursor = 'not-allowed';
                 } else {
                     reloadBtn.disabled = false;
-                    reloadBtn.innerText = '🗑️ Reload';
+                    reloadBtn.innerText = '🗑️ Reload Baseline';
                     reloadBtn.style.opacity = '1.0';
                     reloadBtn.style.cursor = 'pointer';
                 }
+            }
+        }
+
+        function openWEModal() {
+            document.getElementById('modal-we').classList.add('active');
+        }
+
+        function closeWEModal() {
+            document.getElementById('modal-we').classList.remove('active');
+        }
+
+        function clearDiagnosticsUI() {
+            updateSummaryGroup('sum-missing-price', { count: 0, list: [] });
+            updateSummaryGroup('sum-missing-close', { count: 0, list: [] });
+            updateSummaryGroup('sum-missing-vol', { count: 0, list: [] });
+            updateSummaryGroup('sum-missing-adv', { count: 0, list: [] });
+
+            document.getElementById('val-we-counts').innerText = '0E / 0W';
+            const logsContainer = document.getElementById('logs-container');
+            if (logsContainer) {
+                logsContainer.innerHTML = '<div class="empty-state" style="padding: 2rem; color: #94a3b8; font-style: italic;">Processing scan/reload logs...</div>';
+            }
+            const weContainer = document.getElementById('we-modal-logs-container');
+            if (weContainer) {
+                weContainer.innerHTML = '<div class="empty-state" style="padding: 2rem;">No warnings or errors recorded.</div>';
             }
         }
 
@@ -900,11 +946,12 @@
         async function reloadCache() {
             if (isScanning || isTestScanning) return;
             const targetSess = userSelectedSession || 'premarket';
-            if (!confirm(`Invalidate ${targetSess.toUpperCase()} cache and run a fresh scan from IBKR?`)) {
+            if (!confirm(`Reload Baseline data (Previous Close & ADV20) for ${targetSess.toUpperCase()} from IBKR?`)) {
                 return;
             }
 
             isScanning = true;
+            clearDiagnosticsUI();
             updateControlsState();
 
             try {
@@ -913,9 +960,8 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ session: targetSess })
                 });
-                await fetchScanResults();
             } catch (err) {
-                console.error("Error reloading cache:", err);
+                console.error("Error reloading baseline cache:", err);
                 isScanning = false;
                 updateControlsState();
             }
@@ -940,6 +986,7 @@
             if (isScanning || isTestScanning || isAutoScanEnabled || !userSelectedSession) return;
             
             isScanning = true;
+            clearDiagnosticsUI();
             updateControlsState();
 
             try {
@@ -974,6 +1021,7 @@
             if (!tickers.length || !userSelectedSession) return;
 
             isTestScanning = true;
+            clearDiagnosticsUI();
             updateControlsState();
 
             try {
@@ -1027,30 +1075,34 @@
                         restoreBtn.style.display = data.is_test_view_active ? 'inline-block' : 'none';
                     }
 
-                    // Update Metrics
-                    const activeSess = userSelectedSession || 'premarket';
-                    const cs = data.cache_status || {};
-                    const activeData = activeSess === 'postmarket' ? (cs.postmarket || {}) : (cs.premarket || {});
+                    // Update Metrics per session
+                    const sm = data.session_metrics || {};
 
                     // 1. Baseline Card
-                    const bEnd = data.baseline_end_time_pt || (activeData.last_warmed_pt ? activeData.last_warmed_pt : '--');
+                    const bEnd = data.baseline_end_time_pt || '--';
                     document.getElementById('val-baseline-end').innerText = bEnd;
 
-                    const pcCnt = activeData.prev_closes_count || 0;
-                    const advCnt = activeData.adv20s_count || 0;
+                    const pcCnt = sm.prev_closes_count || 0;
+                    const advCnt = sm.adv20s_count || 0;
                     document.getElementById('val-baseline-counts').innerText = `PC: ${pcCnt} | ADV: ${advCnt}`;
 
                     // 2. Last Scan Card
                     const durStr = data.last_scan_duration_sec ? `${data.last_scan_duration_sec}s` : '--';
                     const endStr = data.last_scan_end_time_pt ? `@ ${data.last_scan_end_time_pt}` : '';
-                    document.getElementById('val-last-scan').innerText = `${durStr} ${endStr}`.trim();
+                    const lastScanDisplay = `${durStr} ${endStr}`.trim();
+                    document.getElementById('val-last-scan').innerText = lastScanDisplay || '--';
 
-                    const cCnt = activeData.session_prices_count || 0;
-                    const vCnt = activeData.session_volumes_count || 0;
+                    const cCnt = sm.session_prices_count || 0;
+                    const vCnt = sm.session_volumes_count || 0;
                     document.getElementById('val-last-counts').innerText = `PC: ${pcCnt} | ADV: ${advCnt} | C: ${cCnt} | V: ${vCnt}`;
 
                     // 3. Total Matches Card
                     document.getElementById('val-total-matches').innerText = data.total_matches || 0;
+
+                    // 4. Warnings & Errors Metric Card
+                    const errCnt = data.errors_count || 0;
+                    const warnCnt = data.warnings_count || 0;
+                    document.getElementById('val-we-counts').innerText = `${errCnt}E / ${warnCnt}W`;
 
                     // Update Troubleshooting Last Scan Summary
                     const summary = data.last_scan_summary || {};
@@ -1059,20 +1111,39 @@
                     updateSummaryGroup('sum-missing-vol', summary.missing_volume);
                     updateSummaryGroup('sum-missing-adv', summary.missing_adv20);
 
-                    // Update Warnings & Errors Logs
-                    const logs = data.logs || [];
-                    document.getElementById('lbl-we-count').innerText = `${logs.length} items`;
+                    // Update Modal Warnings & Errors Logs
+                    const weLogs = data.we_logs || [];
+                    const weContainer = document.getElementById('we-modal-logs-container');
+                    if (weContainer) {
+                        if (weLogs.length === 0) {
+                            weContainer.innerHTML = `<div class="empty-state" style="padding: 2rem;">No warnings or errors recorded.</div>`;
+                        } else {
+                            weContainer.innerHTML = weLogs.map(l => `
+                                <div class="log-row">
+                                    <span class="log-time">${l.timestamp}</span>
+                                    <span class="${l.level === 'ERROR' ? 'log-level-err' : 'log-level-warn'}">${l.level}</span>
+                                    <span>${escapeHtml(l.message)}</span>
+                                </div>
+                            `).join('');
+                        }
+                    }
+
+                    // Update Bottom Scan Log (INFO logs only)
+                    const infoLogs = data.info_logs || [];
+                    document.getElementById('lbl-scan-log-count').innerText = `${infoLogs.length} items`;
                     const logsContainer = document.getElementById('logs-container');
-                    if (logs.length === 0) {
-                        logsContainer.innerHTML = `<div class="empty-state" style="padding: 2rem;">No warnings or errors recorded during last scan.</div>`;
-                    } else {
-                        logsContainer.innerHTML = logs.map(l => `
-                            <div class="log-row">
-                                <span class="log-time">${l.timestamp}</span>
-                                <span class="${l.level === 'ERROR' ? 'log-level-err' : 'log-level-warn'}">${l.level}</span>
-                                <span>${escapeHtml(l.message)}</span>
-                            </div>
-                        `).join('');
+                    if (logsContainer) {
+                        if (infoLogs.length === 0) {
+                            logsContainer.innerHTML = `<div class="empty-state" style="padding: 2rem;">No scan logs recorded during last run.</div>`;
+                        } else {
+                            logsContainer.innerHTML = infoLogs.map(l => `
+                                <div class="log-row">
+                                    <span class="log-time">${l.timestamp}</span>
+                                    <span style="color: #60a5fa; font-weight: 700;">INFO</span>
+                                    <span>${escapeHtml(l.message)}</span>
+                                </div>
+                            `).join('');
+                        }
                     }
 
                     // Update Results Table

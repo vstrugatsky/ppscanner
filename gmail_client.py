@@ -1,13 +1,12 @@
-import os
 import asyncio
 import logging
-from typing import Optional, Any
 from pathlib import Path
+from typing import Any
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build, Resource
+from googleapiclient.discovery import Resource, build
 
 from config import GmailConfig
 
@@ -19,8 +18,8 @@ class GmailClientManager:
 
     def __init__(self, config: GmailConfig):
         self.config = config
-        self.creds: Optional[Credentials] = None
-        self.service: Optional[Resource] = None
+        self.creds: Credentials | None = None
+        self.service: Resource | None = None
 
     def authenticate(self) -> Credentials:
         """Synchronous authentication workflow: checks token.json, refreshes if expired, or runs local server auth flow."""
@@ -41,11 +40,15 @@ class GmailClientManager:
         # 2. Refresh or prompt for local browser login if token is invalid
         if not self.creds or not self.creds.valid:
             if self.creds and self.creds.expired and self.creds.refresh_token:
-                logger.info("Gmail OAuth2 token expired. Refreshing using refresh token...")
+                logger.info(
+                    "Gmail OAuth2 token expired. Refreshing using refresh token..."
+                )
                 try:
                     self.creds.refresh(Request())
                 except Exception as e:
-                    logger.warning("Failed to refresh token: %s. Re-authenticating...", e)
+                    logger.warning(
+                        "Failed to refresh token: %s. Re-authenticating...", e
+                    )
                     self.creds = None
 
             if not self.creds:
@@ -82,7 +85,7 @@ class GmailClientManager:
         """Fetch user profile asynchronously."""
         if not self.service:
             await self.authenticate_async()
-        
+
         def _get_profile():
             return self.service.users().getProfile(userId=user_id).execute()
 

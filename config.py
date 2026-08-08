@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import zoneinfo
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,11 +14,17 @@ class IBConfig:
     host: str = "127.0.0.1"
     port: int = 4001
     client_id: int = 1
-    market_data_type: int = 1  # 1 = Real-Time Live, 2 = Frozen, 3 = Delayed, 4 = Delayed Frozen
-    req_tickers_timeout_sec: float = 3.0
-    hist_concurrency_limit: int = 10  # IBKR rate limit semaphore for historical data calls
+    market_data_type: int = (
+        1  # 1 = Real-Time Live, 2 = Frozen, 3 = Delayed, 4 = Delayed Frozen
+    )
+    req_tickers_timeout_sec: float = 5.0
+    hist_concurrency_limit: int = (
+        10  # IBKR rate limit semaphore for historical data calls
+    )
     hist_rth_timeout_sec: float = 10.0  # Timeout for RTH daily bars (useRTH=True)
-    hist_eth_timeout_sec: float = 60.0  # Timeout for extended hours 15-min bars (useRTH=False)
+    hist_eth_timeout_sec: float = (
+        60.0  # Timeout for extended hours 15-min bars (useRTH=False)
+    )
 
 
 @dataclass
@@ -42,6 +47,7 @@ class Config:
         self.contracts_cache_file = self.root_dir / "qualified_contracts.json"
         self.deactivated_tickers_file = self.root_dir / "deactivated_tickers.json"
         self.scan_cache_file = self.root_dir / "scan_cache.json"
+        self.scan_results_file = self.root_dir / "scan_results.json"
 
         self.ib = IBConfig()
         self.gmail = GmailConfig()

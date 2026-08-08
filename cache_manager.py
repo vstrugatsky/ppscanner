@@ -1,8 +1,9 @@
 import json
 import logging
-from pathlib import Path
-from typing import Any, Optional
 from datetime import datetime
+from pathlib import Path
+from typing import Any
+
 from config import PT_TZ
 
 logger = logging.getLogger(__name__)
@@ -48,7 +49,10 @@ class CacheManager:
     def load(self):
         """Loads persistent cache from JSON file."""
         if not self.cache_file_path.exists():
-            logger.info("Cache file %s does not exist yet. Initializing empty cache.", self.cache_file_path.name)
+            logger.info(
+                "Cache file %s does not exist yet. Initializing empty cache.",
+                self.cache_file_path.name,
+            )
             return
 
         try:
@@ -61,7 +65,9 @@ class CacheManager:
                     len(self.cache["postmarket"].get("prev_closes", {})),
                 )
         except Exception as e:
-            logger.warning("Failed to load scan cache file %s: %s", self.cache_file_path, e)
+            logger.warning(
+                "Failed to load scan cache file %s: %s", self.cache_file_path, e
+            )
 
     def save(self):
         """Saves persistent cache to JSON file atomically."""
@@ -71,7 +77,9 @@ class CacheManager:
             temp_file.replace(self.cache_file_path)
             logger.debug("Successfully saved scan cache to disk.")
         except Exception as e:
-            logger.warning("Failed to save scan cache to %s: %s", self.cache_file_path, e)
+            logger.warning(
+                "Failed to save scan cache to %s: %s", self.cache_file_path, e
+            )
 
     def mark_warmed(
         self,
@@ -99,7 +107,11 @@ class CacheManager:
 
     def clear_session_cache(self, session_type: str = "all"):
         """Invalidates and clears cache for premarket, postmarket, or all sessions."""
-        sessions = ["premarket", "postmarket"] if session_type == "all" else [self._normalize_session(session_type)]
+        sessions = (
+            ["premarket", "postmarket"]
+            if session_type == "all"
+            else [self._normalize_session(session_type)]
+        )
         for s in sessions:
             self.cache[s] = {
                 "is_warmed": False,
@@ -114,6 +126,15 @@ class CacheManager:
             }
         self.save()
         logger.info("Cleared scan cache for session(s): %s", session_type)
+
+    def clear_baseline_cache(self, session_type: str = "premarket"):
+        """Clears prev_closes and adv20s while leaving prices/volumes intact."""
+        s = self._normalize_session(session_type)
+        self.cache[s]["prev_closes"] = {}
+        self.cache[s]["adv20s"] = {}
+        self.cache[s]["is_warmed"] = False
+        self.save()
+        logger.info("Cleared baseline cache (prev_closes & adv20s) for %s", s)
 
     def get_warm_status(self) -> dict[str, Any]:
         """Returns warmth status for both premarket and postmarket sessions."""
@@ -145,7 +166,9 @@ class CacheManager:
         }
 
     # Premarket vs Postmarket Getters & Setters
-    def get_prev_close(self, session_type: str, date_str: str, symbol: str) -> Optional[float]:
+    def get_prev_close(
+        self, session_type: str, date_str: str, symbol: str
+    ) -> float | None:
         sess = self._normalize_session(session_type)
         if self.cache[sess].get("prev_close_date") == date_str:
             return self.cache[sess].get("prev_closes", {}).get(symbol.upper())
@@ -156,7 +179,7 @@ class CacheManager:
         self.cache[sess]["prev_close_date"] = date_str
         self.cache[sess].setdefault("prev_closes", {})[symbol.upper()] = float(val)
 
-    def get_adv20(self, session_type: str, date_str: str, symbol: str) -> Optional[float]:
+    def get_adv20(self, session_type: str, date_str: str, symbol: str) -> float | None:
         sess = self._normalize_session(session_type)
         if self.cache[sess].get("prev_close_date") == date_str:
             return self.cache[sess].get("adv20s", {}).get(symbol.upper())
@@ -167,7 +190,9 @@ class CacheManager:
         self.cache[sess]["prev_close_date"] = date_str
         self.cache[sess].setdefault("adv20s", {})[symbol.upper()] = float(val)
 
-    def get_hist_price(self, session_type: str, date_str: str, symbol: str) -> Optional[float]:
+    def get_hist_price(
+        self, session_type: str, date_str: str, symbol: str
+    ) -> float | None:
         sess = self._normalize_session(session_type)
         if self.cache[sess].get("target_date") == date_str:
             return self.cache[sess].get("session_prices", {}).get(symbol.upper())
@@ -178,7 +203,9 @@ class CacheManager:
         self.cache[sess]["target_date"] = date_str
         self.cache[sess].setdefault("session_prices", {})[symbol.upper()] = float(val)
 
-    def get_hist_vol(self, session_type: str, date_str: str, symbol: str) -> Optional[float]:
+    def get_hist_vol(
+        self, session_type: str, date_str: str, symbol: str
+    ) -> float | None:
         sess = self._normalize_session(session_type)
         if self.cache[sess].get("target_date") == date_str:
             return self.cache[sess].get("session_volumes", {}).get(symbol.upper())
