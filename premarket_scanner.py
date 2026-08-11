@@ -199,6 +199,15 @@ class PremarketScanner:
         )
         self.is_test_view_active[sess] = False
 
+    def get_results_for_session(
+        self, session_type: str = "premarket"
+    ) -> list[dict[str, Any]]:
+        """Returns the stored mover matches for the specified session type."""
+        sess = (
+            session_type if session_type in ("premarket", "postmarket") else "premarket"
+        )
+        return self.session_store.get(sess, {}).get("matches", [])
+
     async def _get_target_contracts(
         self, custom_tickers: list[str] | None = None
     ) -> list[Contract]:
@@ -232,8 +241,11 @@ class PremarketScanner:
 
         try:
             now_pt = datetime.now(PT_TZ)
-            target_date_str = now_pt.strftime("%Y%m%d")
-            prev_close_date_str = get_previous_trading_day(now_pt).strftime("%Y%m%d")
+            _, _, target_date, prev_close_date = self.resolve_target_session(
+                selected_session=sess, now_pt=now_pt
+            )
+            target_date_str = target_date.strftime("%Y%m%d")
+            prev_close_date_str = prev_close_date.strftime("%Y%m%d")
 
             logger.info("Starting Baseline-only reload for %s...", sess.capitalize())
             self.cache_manager.clear_baseline_cache(sess)
@@ -245,7 +257,7 @@ class PremarketScanner:
                     return {"status": "error", "message": "IBKR connection failed"}
 
             all_contracts = await self.ib_manager.load_or_qualify_contracts()
-            hist_sem = asyncio.Semaphore(self.config.ib.hist_max_concurrent_requests)
+            hist_sem = asyncio.Semaphore(self.config.ib.hist_concurrency_limit)
             ib = self.ib_manager.ib
 
             if len(all_contracts) > 20:
@@ -600,7 +612,7 @@ class PremarketScanner:
             prev_close_date_str = prev_close_date.strftime("%Y%m%d")
 
             # Check baseline pre-warm status
-            is_warmed = self.cache_manager.is_warmed(session_type, target_date_str)
+            is_warmed = self.cache_manager.is_warmed(session_type)
             if not is_warmed and not is_test_scan:
                 logger.error(
                     "❌ Baseline cache is not warmed for %s session on %s. Please run 'Reload Baseline' first.",

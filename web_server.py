@@ -114,8 +114,18 @@ def create_app(
     @app.post("/api/reload-cache")
     async def reload_cache_endpoint(req: ClearCacheRequest) -> dict[str, Any]:
         if not scanner.is_scanning:
-            asyncio.create_task(
+            task = asyncio.create_task(
                 scanner.reload_baseline_cache(selected_session=req.session)
+            )
+            task.add_done_callback(
+                lambda t: (
+                    t.exception()
+                    and logger.error(
+                        "Background baseline reload failed: %s",
+                        t.exception(),
+                        exc_info=t.exception(),
+                    )
+                )
             )
         return {
             "status": "success",

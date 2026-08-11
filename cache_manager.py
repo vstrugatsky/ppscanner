@@ -105,6 +105,11 @@ class CacheManager:
         current_cache["cached_count"] = count
         self.save()
 
+    def is_warmed(self, session_type: str) -> bool:
+        """Returns True if the baseline cache for the specified session is warmed."""
+        sess = self._normalize_session(session_type)
+        return self.cache.get(sess, {}).get("is_warmed", False)
+
     def clear_session_cache(self, session_type: str = "all"):
         """Invalidates and clears cache for premarket, postmarket, or all sessions."""
         sessions = (
