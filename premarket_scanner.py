@@ -404,6 +404,7 @@ class PremarketScanner:
                 stored_target_date_str,
             )
             self.session_store_manager.reset_session(sess, curr_target_date_str)
+            self.cache_manager.clear_session_cache(sess)
             self.session_store = self.session_store_manager.store
             self.last_scan_summary[sess] = create_empty_summary()
             self.last_scan_results[sess] = []
@@ -850,12 +851,12 @@ class PremarketScanner:
             if not is_test_scan and is_live:
                 for sym, p in prices.items():
                     if p > 0:
-                        self.cache_manager.set_hist_price(
+                        self.cache_manager.set_session_price(
                             session_type, target_date_str, sym, p
                         )
                 for sym, v in volumes.items():
                     if v >= 0:
-                        self.cache_manager.set_hist_vol(
+                        self.cache_manager.set_session_volume(
                             session_type, target_date_str, sym, v
                         )
 
