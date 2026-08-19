@@ -46,8 +46,9 @@ class GmailClientManager:
                 try:
                     self.creds.refresh(Request())
                 except Exception as e:
-                    logger.warning(
-                        "Failed to refresh token: %s. Re-authenticating...", e
+                    logger.error(
+                        "❌ Gmail OAuth2 token expired or revoked (%s). Re-authentication required.",
+                        e,
                     )
                     self.creds = None
 

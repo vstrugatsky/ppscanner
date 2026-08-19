@@ -59,13 +59,25 @@ def get_previous_trading_day(d: date | datetime) -> date:
 
 
 def _extract_ticker_price(ticker: Any) -> float:
-    """Safely extracts live market price or last price from IBKR ticker."""
+    """Extracts live extended-hours trade price or quote midpoint, excluding stale RTH close fallback."""
     try:
-        mp = ticker.marketPrice()
-        if mp and not math.isnan(mp) and mp > 0:
-            return float(mp)
         if ticker.last and not math.isnan(ticker.last) and ticker.last > 0:
             return float(ticker.last)
+        if (
+            ticker.markPrice
+            and not math.isnan(ticker.markPrice)
+            and ticker.markPrice > 0
+        ):
+            return float(ticker.markPrice)
+        if (
+            ticker.bid
+            and not math.isnan(ticker.bid)
+            and ticker.bid > 0
+            and ticker.ask
+            and not math.isnan(ticker.ask)
+            and ticker.ask > 0
+        ):
+            return float((ticker.bid + ticker.ask) / 2.0)
     except Exception:
         pass
     return 0.0
@@ -350,18 +362,15 @@ class PremarketScanner:
             pc_cnt = len(cs.get("prev_closes", {}))
             adv_cnt = len(cs.get("adv20s", {}))
 
-            self.session_store[sess]["baseline_end_time_pt"] = b_time
-            self.session_store[sess]["prev_closes_count"] = pc_cnt
-            self.session_store[sess]["adv20s_count"] = adv_cnt
-            self.session_store[sess]["logs"] = scan_log_buffer.get_logs()
-            self._save_scan_results_store()
-
             logger.info(
-                "Baseline reload complete for %s. PC: %d | ADV: %d",
-                sess,
+                "🏁 Baseline Reload Completed for %s at %s. (PC: %d | ADV20: %d)",
+                sess.capitalize(),
+                b_time,
                 pc_cnt,
                 adv_cnt,
             )
+            self.session_store[sess]["logs"] = scan_log_buffer.get_logs()
+            self._save_scan_results_store()
             return {
                 "status": "success",
                 "message": f"Baseline reload complete for {sess.capitalize()}",
@@ -658,7 +667,7 @@ class PremarketScanner:
                     current_summary["missing_adv20"]["list"].append(sym)
 
             # =========================================================================
-            # STEP 2: PRICE & VOLUME FETCHING ACCORDING TO SPEC MATRIX
+            # STEP 2: PRICE & VOLUME FETCHING
             # =========================================================================
             if is_live:
                 # Live Scan: Dynamic progress-driven retry loop
@@ -925,16 +934,28 @@ class PremarketScanner:
             # Fetch Briefing news for movers if Briefing client is available
             if matches and self.briefing_client:
                 mover_symbols = [m["symbol"] for m in matches]
-                news_map = await self.briefing_client.get_news_for_symbols_batch(
-                    mover_symbols, session_type=session_type, session_date=target_date
-                )
-                for m in matches:
-                    m["briefing_news"] = news_map.get(m["symbol"])
+                try:
+                    news_map = await self.briefing_client.get_news_for_symbols_batch(
+                        mover_symbols,
+                        session_type=session_type,
+                        session_date=target_date,
+                    )
+                    for m in matches:
+                        m["briefing_news"] = news_map.get(m["symbol"])
+                except Exception as e:
+                    logger.error("❌ Failed to fetch Briefing.com news: %s", e)
 
             end_dt = datetime.now(PT_TZ)
             duration_sec = round((end_dt - start_dt).total_seconds(), 1)
             self.last_scan_end_time = end_dt
             self.last_scan_duration_sec = duration_sec
+
+            logger.info(
+                "🏁 Live Scan Completed for %s in %.1fs. Total movers found: %d",
+                session_type.capitalize(),
+                duration_sec,
+                len(matches),
+            )
 
             if is_test_scan:
                 self.test_scan_results[session_type] = matches
@@ -974,11 +995,6 @@ class PremarketScanner:
                 }
                 self._save_scan_results_store()
 
-            logger.info(
-                "Scan completed in %.1f seconds. Total matches: %d",
-                duration_sec,
-                len(matches),
-            )
             return matches
 
         except Exception as e:

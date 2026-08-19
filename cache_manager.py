@@ -195,24 +195,32 @@ class CacheManager:
         self.cache[sess]["prev_close_date"] = date_str
         self.cache[sess].setdefault("adv20s", {})[symbol.upper()] = float(val)
 
-    def get_session_price(self, session_type: str, date_str: str, symbol: str) -> float | None:
+    def get_session_price(
+        self, session_type: str, date_str: str, symbol: str
+    ) -> float | None:
         sess = self._normalize_session(session_type)
         if self.cache[sess].get("target_date") == date_str:
             return self.cache[sess].get("session_prices", {}).get(symbol.upper())
         return None
 
-    def set_session_price(self, session_type: str, date_str: str, symbol: str, val: float):
+    def set_session_price(
+        self, session_type: str, date_str: str, symbol: str, val: float
+    ):
         sess = self._normalize_session(session_type)
         self.cache[sess]["target_date"] = date_str
         self.cache[sess].setdefault("session_prices", {})[symbol.upper()] = float(val)
 
-    def get_session_volume(self, session_type: str, date_str: str, symbol: str) -> float | None:
+    def get_session_volume(
+        self, session_type: str, date_str: str, symbol: str
+    ) -> float | None:
         sess = self._normalize_session(session_type)
         if self.cache[sess].get("target_date") == date_str:
             return self.cache[sess].get("session_volumes", {}).get(symbol.upper())
         return None
 
-    def set_session_volume(self, session_type: str, date_str: str, symbol: str, val: float):
+    def set_session_volume(
+        self, session_type: str, date_str: str, symbol: str, val: float
+    ):
         sess = self._normalize_session(session_type)
         self.cache[sess]["target_date"] = date_str
         self.cache[sess].setdefault("session_volumes", {})[symbol.upper()] = float(val)

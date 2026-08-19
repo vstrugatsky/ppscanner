@@ -61,7 +61,9 @@ class BriefingNewsClient:
             service = self.gmail_manager.service
 
         if not service:
-            logger.warning("Gmail service unavailable. Skipping Briefing news fetch.")
+            logger.error(
+                "❌ Gmail service unavailable or OAuth2 token expired. Skipping Briefing news fetch."
+            )
             return []
 
         try:
@@ -163,7 +165,7 @@ class BriefingNewsClient:
             return parsed_emails
 
         except Exception as e:
-            logger.warning("Error fetching Briefing.com emails: %s", e)
+            logger.error("❌ Failed to fetch Briefing.com emails: %s", e)
             return []
 
     def match_symbols(self, symbols: list[str]) -> dict[str, dict[str, Any] | None]:
