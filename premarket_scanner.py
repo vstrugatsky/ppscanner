@@ -59,16 +59,10 @@ def get_previous_trading_day(d: date | datetime) -> date:
 
 
 def _extract_ticker_price(ticker: Any) -> float:
-    """Extracts live extended-hours trade price or quote midpoint, excluding stale RTH close fallback."""
+    """Extracts live extended-hours trade price or quote midpoint, strictly excluding markPrice/close fallbacks."""
     try:
         if ticker.last and not math.isnan(ticker.last) and ticker.last > 0:
             return float(ticker.last)
-        if (
-            ticker.markPrice
-            and not math.isnan(ticker.markPrice)
-            and ticker.markPrice > 0
-        ):
-            return float(ticker.markPrice)
         if (
             ticker.bid
             and not math.isnan(ticker.bid)
