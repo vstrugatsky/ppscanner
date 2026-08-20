@@ -426,6 +426,7 @@ class PremarketScanner:
         # Check warmth status and counts dynamically from cache_manager
         cs = self.cache_manager.cache.get(sess, {})
         is_warmed = cs.get("is_warmed", False)
+        data["is_warmed"] = is_warmed
 
         data["prev_closes_count"] = len(cs.get("prev_closes", {}))
         data["adv20s_count"] = len(cs.get("adv20s", {}))

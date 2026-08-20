@@ -756,6 +756,7 @@
         let isActiveLiveSession = false;
         let isScanning = false;
         let isTestScanning = false;
+        let isCacheWarmed = false;
         let sortField = 'abs_change_pct';
         let sortAsc = false;
         let rawResults = [];
@@ -946,8 +947,10 @@
         async function reloadCache() {
             if (isScanning || isTestScanning) return;
             const targetSess = userSelectedSession || 'premarket';
-            if (!confirm(`Reload Baseline data (Previous Close & ADV20) for ${targetSess.toUpperCase()} from IBKR?`)) {
-                return;
+            if (isCacheWarmed) {
+                if (!confirm(`Reload Baseline data (Previous Close & ADV20) for ${targetSess.toUpperCase()} from IBKR?`)) {
+                    return;
+                }
             }
 
             isScanning = true;
@@ -1046,6 +1049,7 @@
                 const data = await res.json();
 
                 if (data.status === 'success') {
+                    isCacheWarmed = !!data.is_warmed;
                     // Update Market Status Badge
                     const statusText = data.market_status || 'Market Closed';
                     const statusBadge = document.getElementById('lbl-market-status');
